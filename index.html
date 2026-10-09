@@ -1,0 +1,2381 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Quizlet 2.0</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Familjen+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+/* Layout concept: one calm column, ink-on-paper, with a highlighter-yellow marker used only for "this is active / this is you". */
+:root{
+  --bg:#F3F4FA; --surface:#FFFFFF; --surface-2:#E8EAF5;
+  --ink:#151A3F; --ink-2:#555B86; --line:#D3D7EA;
+  --hl:#FFE45C; --on-hl:#151A3F; --mark:#FFE45C;
+  --warn:#9A6A00; --warn-bg:#FFF2C2; --good:#0E8F58; --good-bg:#DDF5E9; --bad:#C93A31; --bad-bg:#FCE3E0;
+  --shadow:0 1px 0 rgba(21,26,63,.06), 0 10px 26px -14px rgba(21,26,63,.30);
+  --f-display:'Familjen Grotesk','Helvetica Neue',Arial,sans-serif;
+  --f-body:'Hanken Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'DM Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1026; --surface:#161A3A; --surface-2:#20254B;
+    --ink:#EDEFFF; --ink-2:#A4AADB; --line:#2D3364;
+    --hl:#FFE45C; --on-hl:#151A3F; --mark:rgba(255,228,92,.34);
+    --warn:#FFD166; --warn-bg:#3F3411; --good:#4BD88F; --good-bg:#12382B; --bad:#FF8279; --bad-bg:#472122;
+    --shadow:0 1px 0 rgba(0,0,0,.4), 0 10px 26px -14px rgba(0,0,0,.7);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1026; --surface:#161A3A; --surface-2:#20254B;
+  --ink:#EDEFFF; --ink-2:#A4AADB; --line:#2D3364;
+  --hl:#FFE45C; --on-hl:#151A3F; --mark:rgba(255,228,92,.34);
+  --warn:#FFD166; --warn-bg:#3F3411; --good:#4BD88F; --good-bg:#12382B; --bad:#FF8279; --bad-bg:#472122;
+  --shadow:0 1px 0 rgba(0,0,0,.4), 0 10px 26px -14px rgba(0,0,0,.7);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;min-height:100%}
+h1,h2,h3{font-family:var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:2.5px solid var(--ink);outline-offset:2px;border-radius:6px}
+.mono{font-family:var(--f-mono)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.i{display:inline-flex;flex:none}
+.i svg{width:1.25em;height:1.25em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mark{background:linear-gradient(transparent 58%,var(--mark) 58%,var(--mark) 93%,transparent 93%);padding:0 .1em;margin:0 -.1em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.wrap{width:100%;max-width:1040px;margin-inline:auto;padding-inline:clamp(16px,4vw,28px)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;height:60px}
+.brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:4px 6px 4px 0;font:700 21px/1 var(--f-display);letter-spacing:-.02em}
+.brand svg{width:32px;height:32px;flex:none}
+.brand b{font:500 13px/1 var(--f-mono);background:var(--hl);color:var(--on-hl);padding:4px 6px;border-radius:5px;transform:rotate(-3deg);letter-spacing:0}
+.logo-c1{fill:var(--surface-2);stroke:var(--ink);stroke-width:2}
+.logo-c2{fill:var(--surface);stroke:var(--ink);stroke-width:2}
+.logo-hl{fill:var(--hl)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:10px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-weight:600;line-height:1.2;text-decoration:none;transition:transform .12s, background .12s}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:active:not(:disabled){transform:none}
+.btn.primary{background:var(--ink);color:var(--bg)}
+.btn.hl{background:var(--hl);color:var(--on-hl);border-color:var(--hl)}
+.btn.ghost{border-color:var(--line);background:var(--surface)}
+.btn.ghost:hover:not(:disabled){border-color:var(--ink)}
+.btn.link{border-color:transparent;padding-inline:8px;color:var(--ink-2)}
+.btn.link:hover:not(:disabled){color:var(--ink)}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.45}
+.icon-btn{width:38px;height:38px;display:inline-grid;place-items:center;border:0;border-radius:9px;background:transparent;color:var(--ink-2)}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+.round{width:54px;height:54px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);display:grid;place-items:center;transition:background .12s,border-color .12s}
+.round:hover:not(:disabled){border-color:var(--ink);background:var(--hl);color:var(--on-hl)}
+.round:disabled{opacity:.35}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* views */
+.view{padding-block:28px 80px;animation:rise .25s ease both}
+@keyframes rise{from{transform:translateY(5px)}to{transform:none}}
+.eyebrow{font:500 12px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.sec{margin-top:48px}
+.sec-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.sec-h h2{font-size:1.6rem}
+.sub{color:var(--ink-2)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:36px;align-items:center}
+.hero-copy{display:grid;gap:18px;justify-items:start}
+.hero h1{font-size:clamp(2.3rem,6vw,3.9rem);line-height:1.02;font-weight:700;letter-spacing:-.03em}
+.lead{font-size:1.15rem;color:var(--ink-2);max-width:46ch}
+.hero-art svg{display:block;width:100%;max-width:440px;height:auto;margin-inline:auto}
+.art .c3{fill:var(--surface-2);stroke:var(--line);stroke-width:2}
+.art .c2{fill:var(--surface);stroke:var(--line);stroke-width:2}
+.art .c1{fill:var(--surface);stroke:var(--ink);stroke-width:2.5}
+.art .swipe{fill:var(--mark)}
+.art .t1{font:700 46px var(--f-display);fill:var(--ink);letter-spacing:-1px}
+.art .t2{font:500 17px var(--f-body);fill:var(--ink-2)}
+.art .t3{font:500 13px var(--f-mono);fill:var(--ink-2)}
+.art .key{fill:var(--surface);stroke:var(--ink);stroke-width:2}
+.art .kt{font:500 15px var(--f-mono);fill:var(--ink)}
+@media (max-width:760px){.hero{grid-template-columns:1fr;gap:20px}}
+
+/* decks */
+.decks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:14px}
+.deck{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:150px;width:100%;padding:18px;text-align:left;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:16px;transition:border-color .12s, transform .12s}
+.deck:hover{border-color:var(--ink);transform:translateY(-2px)}
+.deck h3{font-size:1.2rem;line-height:1.2;overflow-wrap:anywhere}
+.deck p{color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.deck .meta{margin-top:auto;font:500 12px var(--f-mono);color:var(--ink-2)}
+.deck.new{border-style:dashed;align-items:center;justify-content:center;gap:6px;background:transparent;color:var(--ink-2);font-weight:600}
+.deck.new .i svg{width:1.8em;height:1.8em}
+.tag{display:inline-block;font:500 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);color:var(--ink-2);padding:2px 7px;border-radius:999px}
+.add-round{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--ink);background:var(--hl);color:var(--on-hl);display:grid;place-items:center;flex:none}
+.add-round:hover{transform:rotate(90deg)}
+.add-round{transition:transform .2s}
+
+/* review */
+.review{background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:22px}
+.review ul{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px}
+.rv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:10px 4px 10px 12px;border-radius:10px;background:var(--bg)}
+.rv-t{min-width:0;overflow-wrap:anywhere}
+.rv-t .arrow{color:var(--ink-2);margin-inline:8px}
+.rv-deck{grid-column:1;font:500 12px var(--f-mono);color:var(--ink-2)}
+.rv .icon-btn{grid-row:1/3;grid-column:2}
+
+/* hub */
+.hub-top{display:grid;gap:12px;margin:8px 0 28px}
+.hub-top h1{font-size:clamp(1.9rem,5vw,2.8rem);line-height:1.08;overflow-wrap:anywhere}
+.hub-top .desc{color:var(--ink-2);max-width:62ch;white-space:pre-wrap;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.fns{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,185px),1fr));gap:12px}
+.fn{display:flex;flex-direction:column;align-items:flex-start;gap:10px;text-align:left;padding:18px;border-radius:16px;background:var(--surface);border:1.5px solid var(--line);color:var(--ink);transition:transform .12s,border-color .12s}
+.fn:hover:not(:disabled){border-color:var(--ink);transform:translateY(-2px)}
+.fn:hover:not(:disabled) .fn-i{background:var(--hl);color:var(--on-hl)}
+.fn-i{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:var(--surface-2);transition:background .12s}
+.fn h3{font-size:1.15rem}
+.fn p{color:var(--ink-2);font-size:14px}
+.fn:disabled{opacity:.55}
+.note-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:16px;padding:14px 16px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface)}
+details.cards-list{margin-top:28px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface)}
+details.cards-list summary{padding:14px 16px;font-weight:600;cursor:pointer}
+.cl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:6px 20px;padding:0 16px 16px}
+.cl div{padding:8px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.cl .h{font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);border:0;padding-bottom:0}
+.confirm{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--bad-bg);border:1.5px solid var(--bad)}
+
+/* forms */
+.form{max-width:780px;display:grid;gap:22px}
+.form h1{font-size:clamp(1.8rem,5vw,2.4rem)}
+.field{display:grid;gap:7px}
+.field>label,.lbl{font-weight:600;font-size:14px}
+.in{width:100%;padding:11px 13px;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:10px;font:inherit;line-height:1.4}
+.in:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px var(--mark)}
+.in::placeholder{color:var(--ink-2);opacity:.7}
+textarea.in{resize:vertical;min-height:44px}
+.in.big{font-size:1.2rem;padding:14px 16px}
+.hint{font-size:13px;color:var(--ink-2)}
+.setting{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface)}
+.setting-l{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.setting-l strong{font-family:var(--f-display);font-size:1.1rem}
+.info{position:relative;display:inline-flex}
+.info>button{width:30px;height:30px;border:0;background:transparent;border-radius:50%;display:grid;place-items:center;color:var(--ink-2)}
+.info>button:hover{color:var(--ink);background:var(--surface-2)}
+.tip{display:none;position:absolute;left:0;top:36px;z-index:3;width:min(300px,78vw);padding:12px 14px;border-radius:12px;background:var(--ink);color:var(--bg);font-size:14px;line-height:1.45;box-shadow:var(--shadow)}
+.info.open .tip{display:block}
+@media (hover:hover) and (pointer:fine){.info:hover .tip{display:block}}
+.switch{width:46px;height:27px;border-radius:999px;background:var(--surface-2);border:1.5px solid var(--ink-2);position:relative;padding:0;flex:none;transition:background .15s,border-color .15s}
+.switch .knob{position:absolute;top:2.5px;left:2.5px;width:19px;height:19px;border-radius:50%;background:var(--ink);transition:transform .15s}
+.switch[aria-checked="true"]{background:var(--hl);border-color:var(--ink)}
+.switch[aria-checked="true"] .knob{transform:translateX(19px);background:var(--on-hl)}
+.switch:disabled{opacity:.5}
+.tg{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 0;font-weight:500}
+.soon{font:500 10px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--ink-2);padding:1px 6px;border-radius:999px;margin-left:8px;font-style:normal}
+.slots{display:grid;gap:10px}
+.slot{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1.6fr) auto;grid-template-areas:"n w d a";gap:10px;align-items:center}
+.slot-n{grid-area:n;font:500 13px var(--f-mono);color:var(--ink-2);text-align:center}
+.slot .cw{grid-area:w}.slot .cd{grid-area:d}.slot-a{grid-area:a;display:flex;gap:2px}
+@media (max-width:640px){
+  .slot{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"n w a" "n d a";gap:6px 8px;padding-bottom:10px;border-bottom:1px dashed var(--line)}
+  .slot-a{flex-direction:column}
+}
+.add-card{justify-self:start}
+.bulk{display:grid;gap:10px;padding:16px;border:1.5px dashed var(--line);border-radius:14px}
+.bulk-info{font:500 13px var(--f-mono);color:var(--ink-2)}
+.err{color:var(--bad);font-weight:600;min-height:1.4em}
+.form-actions{display:flex;flex-wrap:wrap;gap:10px}
+
+/* study shell */
+.sbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:22px}
+.sbar-t{font-size:1.1rem;text-align:center}
+.sbar .btn.link{justify-self:start}
+@media (max-width:520px){.sbar{grid-template-columns:auto 1fr}.sbar>:last-child{display:none}.sbar-t{text-align:right}}
+.opts{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;justify-content:center;margin-top:22px}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.seg button{border:0;background:transparent;padding:8px 14px;font-weight:600;font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--hl);color:var(--on-hl)}
+.opts .tg{padding:0;gap:10px;font-size:14px}
+.desk-only{display:none}
+@media (hover:hover) and (pointer:fine){.desk-only{display:block}.kc{display:inline-flex!important}}
+.kc{display:none;flex:none;min-width:22px;height:22px;padding:0 4px;align-items:center;justify-content:center;border:1px solid var(--line);border-bottom-width:2.5px;border-radius:5px;font:500 11px var(--f-mono);color:var(--ink-2);background:var(--bg)}
+.center-hint{text-align:center;font-size:13px;color:var(--ink-2);margin-top:14px}
+
+/* flashcards */
+.fc-stage{max-width:720px;margin:0 auto;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.fc{width:100%;aspect-ratio:3/2;min-height:230px;cursor:pointer;display:block}
+.fc-inner{position:relative;width:100%;height:100%;}
+.fc-inner.turn{animation:turn .3s ease}
+@keyframes turn{0%{transform:scaleX(1)}50%{transform:scaleX(.02)}100%{transform:scaleX(1)}}
+.fc-face{position:absolute;inset:0;border-radius:22px;background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--shadow);display:grid;place-items:center;padding:34px 26px 26px;text-align:center}
+.fc-face.back{background:var(--surface-2)}
+.fc-label{position:absolute;top:14px;left:18px;font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.fc-text{font:600 clamp(1.6rem,5vw,2.6rem)/1.15 var(--f-display);max-height:100%;overflow:auto;overflow-wrap:anywhere;letter-spacing:-.01em}
+.fc-text.mid{font-size:clamp(1.3rem,3.6vw,1.9rem)}
+.fc-text.long{font:500 clamp(1.05rem,2.6vw,1.3rem)/1.4 var(--f-body)}
+.fc-stage.in-next .fc{animation:slideR .22s ease both}
+.fc-stage.in-prev .fc{animation:slideL .22s ease both}
+@keyframes slideR{from{transform:translateX(26px)}to{transform:none}}
+@keyframes slideL{from{transform:translateX(-26px)}to{transform:none}}
+.fc-nav{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:22px}
+.count{font:500 15px var(--f-mono);min-width:70px;text-align:center}
+
+/* match */
+.mbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;font-size:14px;color:var(--ink-2)}
+.mgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mcol{display:grid;gap:10px;align-content:start;min-width:0}
+.mcol-h{font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.mlist{display:grid;gap:10px}
+@media (max-width:560px){.mgrid{gap:8px}.mlist{gap:8px}.tile{min-height:76px;padding:10px 11px;font-size:13.5px}.tile.k-w{font-size:15px}}
+.tile{display:flex;align-items:center;gap:10px;text-align:left;min-height:96px;padding:14px 16px;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:12px;font:500 15px/1.35 var(--f-body);overflow-wrap:anywhere;transition:background .12s,border-color .12s,opacity .25s,transform .12s}
+.tile.k-w{font:600 17px/1.25 var(--f-display)}
+.tile:hover:not(:disabled){border-color:var(--ink)}
+.tile.sel{background:var(--hl);color:var(--on-hl);border-color:var(--ink);transform:translateY(-2px)}
+.tile.sel .kc{background:transparent;border-color:var(--on-hl);color:var(--on-hl)}
+.tile.ok{background:var(--good-bg);border-color:var(--good)}
+.tile.bad{background:var(--bad-bg);border-color:var(--bad);animation:shake .38s}
+.tile.done{opacity:.35;background:transparent;border-style:dashed}
+@keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+
+/* write, choose, learn */
+.wtop{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.pbar{flex:1;height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
+.pbar i{display:block;height:100%;width:0;background:var(--ink);border-radius:99px;transition:width .3s}
+.wq{max-width:720px;margin:0 auto;display:grid;gap:18px}
+.wprompt{position:relative;background:var(--surface);border:1.5px solid var(--ink);border-radius:20px;padding:44px 24px 30px;text-align:center;box-shadow:var(--shadow)}
+.wp-text{font:600 clamp(1.5rem,4.6vw,2.4rem)/1.2 var(--f-display);overflow-wrap:anywhere}
+.wp-text.long{font:500 clamp(1.1rem,3vw,1.4rem)/1.4 var(--f-body)}
+.wp-text.xl{font:500 1.05rem/1.5 var(--f-body)}
+.warea{display:grid;gap:14px}
+.ask{font-weight:600;color:var(--ink-2);font-size:14px}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:10px}
+.choice{display:flex;align-items:center;gap:12px;text-align:left;padding:14px 16px;border-radius:12px;background:var(--surface);border:1.5px solid var(--line);font-weight:500;overflow-wrap:anywhere;transition:background .12s,border-color .12s}
+.choice:hover:not(:disabled){border-color:var(--ink);background:var(--hl);color:var(--on-hl)}
+.choice:hover:not(:disabled) .kc{border-color:var(--on-hl);color:var(--on-hl);background:transparent}
+.choice.right{background:var(--good-bg);border-color:var(--good);color:var(--ink)}
+.choice.wrong{background:var(--bad-bg);border-color:var(--bad);color:var(--ink)}
+.choice:disabled{opacity:1}
+.choice:disabled:not(.right):not(.wrong){opacity:.55}
+.fb{display:grid;gap:8px;padding:16px 18px;border-radius:14px;border:1.5px solid}
+.fb.ok{background:var(--good-bg);border-color:var(--good)}
+.fb.bad{background:var(--bad-bg);border-color:var(--bad)}
+.fb.near{background:var(--warn-bg);border-color:var(--warn)}
+.in.ok{border-color:var(--good);background:var(--good-bg)}
+.in.bad{border-color:var(--bad);background:var(--bad-bg)}
+.in.near{border-color:var(--warn);background:var(--warn-bg)}
+.fb strong{font-family:var(--f-display);font-size:1.15rem}
+.ans-good{font-weight:700;overflow-wrap:anywhere}
+.ans-bad{text-decoration:line-through;overflow-wrap:anywhere}
+.result{max-width:640px;margin:20px auto 0;display:grid;gap:16px;justify-items:start}
+.score{font:700 clamp(2.6rem,9vw,4.4rem)/1 var(--f-display);letter-spacing:-.03em}
+.miss-list{list-style:none;padding:0;margin:0;display:grid;gap:6px;width:100%}
+.miss-list li{padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);overflow-wrap:anywhere}
+.miss-list .arrow{color:var(--ink-2);margin-inline:8px}
+.lhead{display:grid;gap:12px;margin-bottom:22px}
+.trail{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.trail .sep{color:var(--ink-2)}
+.chip{border:1.5px solid var(--line);border-radius:999px;padding:3px 11px;font:500 12px var(--f-mono);color:var(--ink-2);background:var(--surface)}
+.chip.cur{background:var(--hl);color:var(--on-hl);border-color:var(--ink)}
+.chip.done{color:var(--ink)}
+.lprog{display:flex;align-items:center;gap:14px}
+.lprog .mono{font-size:13px;min-width:44px;text-align:right}
+.lcap{font-weight:600;color:var(--ink-2);margin-bottom:14px}
+.intro{display:grid;gap:12px;justify-items:center;text-align:center;padding:36px 12px}
+.intro h2{font-size:1.8rem}
+.intro p{max-width:46ch;color:var(--ink-2)}
+
+/* test */
+.cfg{max-width:640px;display:grid;gap:20px}
+.cfg h1{font-size:clamp(1.8rem,5vw,2.4rem)}
+.qh{font:500 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:26px 0 10px}
+.q{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:12px;display:grid;gap:12px}
+.q-top{display:flex;gap:10px;align-items:baseline;font:500 12px var(--f-mono);color:var(--ink-2)}
+.qp{font:600 1.25rem/1.3 var(--f-display);overflow-wrap:anywhere}
+.qp.long{font:500 1.05rem/1.45 var(--f-body)}
+.tf-line{padding:10px 12px;border-radius:10px;background:var(--bg);overflow-wrap:anywhere}
+.tf-line .arrow{color:var(--ink-2);margin-inline:8px}
+.choice.picked{background:var(--hl);color:var(--on-hl);border-color:var(--ink)}
+.choice.picked .kc{border-color:var(--on-hl);color:var(--on-hl);background:transparent}
+.q.sel{border-color:var(--ink);box-shadow:0 0 0 4px var(--mark)}
+.q.ok{border-color:var(--good)}
+.q.bad{border-color:var(--bad)}
+.q-res{display:flex;gap:10px;align-items:flex-start}
+.q-res .i{margin-top:3px}
+.q-res.ok{color:var(--good)}.q-res.bad{color:var(--bad)}
+.q-res>div{color:var(--ink);overflow-wrap:anywhere}
+.submit-bar{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:20px}
+
+
+/* images, markup, blanks */
+.cimg,.fc-img,.t-img,.wp-img,.q-img,.cl-img{display:block;max-width:100%;border-radius:10px;object-fit:contain}
+.fc-body{display:grid;gap:12px;justify-items:center;max-height:100%;overflow:auto;min-width:0}
+.fc-img{max-height:150px}
+.t-img{max-height:70px;margin-bottom:6px}
+.tt{display:grid;min-width:0}
+.wp-img{max-height:170px;margin:0 auto 14px}
+.q-img{max-height:150px}
+.cl-img{max-height:56px;margin-bottom:4px}
+.wp-text.cz{font:500 clamp(1.3rem,3.6vw,1.9rem)/1.5 var(--f-display)}
+.wp-text.cz strong{font-weight:700}
+.blank{display:inline-block;vertical-align:baseline;min-width:3.5ch;height:1.1em;border-bottom:3px solid var(--ink);margin:0 .15em;transform:translateY(.12em)}
+.hint-mask{font:500 1.3rem/1.5 var(--f-mono);letter-spacing:.2em;white-space:pre-wrap;overflow-wrap:anywhere;min-height:0}
+.hint-mask:empty{display:none}
+/* editor */
+.cell{display:grid;gap:6px;min-width:0}
+.slot .cw{grid-area:w}.slot .cd{grid-area:d}
+.cell-t{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.icon-btn.sm{width:30px;height:30px}
+.thumb{display:inline-flex;align-items:center;gap:2px;padding:3px 3px 3px 3px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.thumb img{display:block;height:34px;width:auto;max-width:90px;border-radius:5px;object-fit:cover}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.fmt{min-width:38px;height:34px;padding:0 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);font:600 14px var(--f-mono)}
+.fmt:hover{border-color:var(--ink);background:var(--hl);color:var(--on-hl)}
+.fmt.b{font-weight:800}.fmt.it{font-style:italic}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px}
+select.in{appearance:auto}
+/* read aloud */
+.speak{color:var(--ink-2)}
+.speak.corner{position:absolute;top:8px;right:8px}
+.speak.big{width:46px;height:46px;border:1.5px solid var(--line);border-radius:50%;background:var(--surface)}
+.speak.big:hover{background:var(--hl);color:var(--on-hl);border-color:var(--ink)}
+.cnt-wrap{display:flex;align-items:center;gap:10px}
+/* records */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px}
+.stat-card{display:grid;gap:8px;align-content:start;padding:18px;border:1.5px solid var(--line);border-radius:16px;background:var(--surface)}
+.stat-big{font:700 2.4rem/1 var(--f-display);letter-spacing:-.02em}
+.bars{display:flex;align-items:flex-end;gap:5px;height:56px;padding-bottom:1px;border-bottom:1.5px solid var(--line)}
+.bars i{flex:1;max-width:22px;background:var(--ink);border-radius:3px 3px 0 0;min-height:3px}
+.bars i:last-child{background:var(--hl);box-shadow:inset 0 0 0 1.5px var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.cell-t{display:none}
+.cell:focus-within .cell-t{display:flex}
+.fmt-group{display:inline-flex;gap:6px;flex-wrap:wrap}
+.fmt.imgb{display:inline-flex;align-items:center;gap:4px}
+.preview{padding:8px 10px;border:1px dashed var(--line);border-radius:8px;background:var(--surface-2);overflow-wrap:anywhere}
+.pv-l{display:block;font:500 10px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:2px}
+.pv-blank{background:var(--hl);color:var(--on-hl);border-bottom:2px solid var(--ink);padding:0 3px;border-radius:3px}
+.fmt.blankbtn{background:var(--surface)}
+.keybtn{cursor:pointer;outline:none}
+.keybtn:hover rect,.keybtn:active rect{fill:var(--hl)}
+.keybtn:focus-visible rect{stroke-width:4}
+/* resume, public decks */
+.resume{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin:26px 0 0;padding:16px 18px;border:1.5px solid var(--ink);border-radius:16px;background:var(--surface);box-shadow:var(--shadow)}
+.rs-t{display:grid;gap:2px;min-width:0}
+.rs-t strong{font:600 1.1rem var(--f-display);overflow-wrap:anywhere}
+.tag.hl{background:var(--hl);color:var(--on-hl);border-color:var(--ink)}
+.pubbox{display:grid;gap:8px}
+.pubbox:empty{display:none}
+.pubbox .confirm{background:var(--surface-2);border-color:var(--ink)}
+.toolbar .in{flex:1;min-width:0}
+.votes{display:flex;gap:10px}
+.vbtn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font:600 14px var(--f-mono)}
+.vbtn:hover:not(:disabled){border-color:var(--ink)}
+.vbtn[aria-pressed="true"]{background:var(--hl);color:var(--on-hl);border-color:var(--ink)}
+.vbtn:disabled{opacity:.6;cursor:not-allowed}
+.cl.cl-open{padding:0;margin-top:8px}
+.tapnote{margin:0}
+[hidden]{display:none!important}
+</style>
+<header class="top"><div class="wrap top-in">
+<button type="button" class="brand" id="brand" aria-label="Quizlet 2.0, go to the home page">
+<svg viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-c1" x="3" y="9" width="20" height="16" rx="3" transform="rotate(-8 13 17)"/><rect class="logo-c2" x="9" y="7" width="20" height="16" rx="3" transform="rotate(4 19 15)"/><rect class="logo-hl" x="13" y="14" width="12" height="4" rx="1" transform="rotate(4 19 16)"/></svg>
+<span>Quizlet</span><b>2.0</b></button>
+</div></header>
+<main id="app"></main>
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   Pure helpers
+   ===================================================================== */
+const uid=()=>Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,8);
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function chunk(a,n){const r=[];for(let i=0;i<a.length;i+=n)r.push(a.slice(i,i+n));return r;}
+function norm(s){return String(s==null?'':s).normalize('NFC').toLowerCase().replace(/[\s ]+/g,' ').replace(/[.!?;,]+$/,'').trim();}
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+function lenClass(t){return t.length>90?'xl':t.length>40?'long':'';}
+
+/* Markup: **bold**, *italic*, {blank}. plain() strips all of it. */
+function plain(s){
+  return String(s==null?'':s).replace(/\*\*([^*]+?)\*\*/g,'$1').replace(/\*([^*\s][^*]*?)\*/g,'$1').replace(/[{}]/g,'');
+}
+function rich(s){
+  const frag=document.createDocumentFragment();
+  s=String(s==null?'':s).replace(/[{}]/g,'');
+  const re=/\*\*([^*]+?)\*\*|\*([^*\s][^*]*?)\*/g;
+  let last=0,m;
+  while((m=re.exec(s))){
+    if(m.index>last)frag.append(document.createTextNode(s.slice(last,m.index)));
+    const el=document.createElement(m[1]!==undefined?'strong':'em');
+    el.textContent=m[1]!==undefined?m[1]:m[2];
+    frag.append(el);
+    last=re.lastIndex;
+  }
+  if(last<s.length)frag.append(document.createTextNode(s.slice(last)));
+  return frag;
+}
+function parseCloze(s){
+  s=String(s==null?'':s);
+  const parts=[],re=/\{([^{}]+)\}/g;
+  let last=0,m,n=0;
+  while((m=re.exec(s))){
+    if(m.index>last)parts.push({v:s.slice(last,m.index)});
+    parts.push({v:m[1],blank:n++});
+    last=re.lastIndex;
+  }
+  if(last<s.length)parts.push({v:s.slice(last)});
+  return{parts,n};
+}
+const hasBlanks=s=>parseCloze(s).n>0;
+function blankAnswer(cl,i){const p=cl.parts.find(x=>x.blank===i);return p?plain(p.v).trim():'';}
+
+/* Bulk import: the user picks the separator, so a space never splits a card */
+function splitLine(line,sep){
+  line=line.trim();if(!line)return null;
+  let i=-1,len=sep.length;
+  if(sep==='-'){
+    const j=line.search(/\s[-–—]\s/);
+    if(j>=0){i=j+1;len=1;}else i=line.indexOf('-');
+  }else i=line.indexOf(sep);
+  if(i<=0)return null;
+  const w=line.slice(0,i).trim(),d=line.slice(i+len).trim();
+  return(w&&d)?{w,d}:null;
+}
+function parseBulk(text,sep){
+  const pairs=[],skipped=[];
+  String(text||'').split(/\r?\n/).forEach(l=>{
+    if(!l.trim())return;
+    const p=splitLine(l,sep||';');
+    if(p)pairs.push(p);else skipped.push(l.trim());
+  });
+  return{pairs,skipped};
+}
+function sectionSizes(n){
+  if(n<=0)return[];
+  const k=Math.ceil(n/8),base=Math.floor(n/k),extra=n%k;
+  return Array.from({length:k},(_,i)=>base+(i<extra?1:0));
+}
+function pairsPerRound(n){return n<=5?n:(n<=8?Math.ceil(n/2):5);}
+function variants(ans){
+  const out=new Set();
+  const add=s=>{const n=norm(s);if(n)out.add(n);};
+  const strip=s=>s.replace(/\([^)]*\)/g,' ');
+  ans=plain(ans);
+  add(ans);add(strip(ans));
+  ans.split(/\s*[;\/,]\s*/).forEach(p=>{add(p);add(strip(p));});
+  return Array.from(out);
+}
+function isRight(given,answer){
+  const g=norm(given);
+  if(!g)return false;
+  return variants(answer).indexOf(g)!==-1;
+}
+/* Damerau-Levenshtein (optimal string alignment): swapping two letters costs 1 */
+function lev(a,b){
+  const m=a.length,n=b.length;
+  if(!m)return n;if(!n)return m;
+  const d=[];
+  for(let i=0;i<=m;i++){d.push(new Array(n+1).fill(0));d[i][0]=i;}
+  for(let j=0;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){
+    const c=a[i-1]===b[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c);
+    if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1);
+  }
+  return d[m][n];
+}
+function judge(given,answer){
+  const g=norm(given);
+  if(!g)return{r:'wrong'};
+  const vs=variants(answer);
+  if(vs.indexOf(g)!==-1)return{r:'exact'};
+  let best=null;
+  vs.forEach(v=>{
+    const lim=v.length<=3?0:(v.length<=7?1:2);
+    if(!lim||Math.abs(v.length-g.length)>lim)return;
+    const dist=lev(g,v);
+    if(dist<=lim&&(best===null||dist<best))best=dist;
+  });
+  return best===null?{r:'wrong'}:{r:'near',dist:best};
+}
+const isLetter=ch=>/[\p{L}\p{N}]/u.test(ch);
+function letterCount(s){return Array.from(String(s)).filter(isLetter).length;}
+function maskHint(ans,k){
+  let n=0;
+  return Array.from(String(ans)).map(ch=>{if(!isLetter(ch))return ch;n++;return n<=k?ch:'_';}).join('');
+}
+function distractors(c,answer,wd,k){
+  const seen=new Set([norm(answer)]),out=[];
+  shuffle(c.deck.cards).forEach(x=>{
+    if(x.id===c.id||out.length>=k)return;
+    const t=plain(wd?x.d:x.w),n=norm(t);
+    if(!n||seen.has(n))return;
+    seen.add(n);out.push(t);
+  });
+  return out;
+}
+function makeOptions(c,answer,wd,n){return shuffle([answer].concat(distractors(c,answer,wd,n-1))).filter(t=>typeof t==='string'&&t.trim());}
+
+/* =====================================================================
+   DOM helpers
+   ===================================================================== */
+const app=document.getElementById('app');
+function h(tag,props,...kids){
+  const e=document.createElement(tag);
+  for(const k in (props||{})){
+    const v=props[k];
+    if(v==null||v===false)continue;
+    if(k==='class')e.className=v;
+    else if(k==='html')e.innerHTML=v;
+    else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),v);
+    else if(v===true)e.setAttribute(k,'');
+    else e.setAttribute(k,v);
+  }
+  kids.flat(Infinity).forEach(c=>{if(c==null||c===false)return;e.append(c.nodeType?c:document.createTextNode(String(c)));});
+  return e;
+}
+const ICON={
+  plus:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  x:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  back:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
+  next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  info:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3"/></svg>',
+  cards:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="14" height="12" rx="2"/><path d="M7 4h12a2 2 0 012 2v9"/></svg>',
+  match:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M10 7h2a2 2 0 012 2v5"/></svg>',
+  write:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 16l9-9 3 3-9 9-4 1z"/></svg>',
+  learn:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h5v-5h5v-5h5V5h3"/></svg>',
+  test:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 14l2 2 4-4"/></svg>',
+  check:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>',
+  cross:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  sound:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zM16.5 9a4 4 0 010 6M19 6.5a8 8 0 010 11"/></svg>',
+  image:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg>',
+  bulb:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>',
+  up:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v13M6 13l6 6 6-6"/></svg>',
+  globe:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>',
+  export:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M5 21h14"/></svg>'
+};
+const icon=n=>h('span',{class:'i',html:ICON[n]});
+function btn(label,o){
+  o=o||{};
+  return h('button',{type:'button',class:'btn '+(o.cls||''),id:o.id,disabled:o.disabled,title:o.title,onclick:o.onclick},o.icon?icon(o.icon):null,label);
+}
+function seg(options,value,onChange,label){
+  const wrap=h('div',{class:'seg',role:'group','aria-label':label});
+  const btns=options.map(op=>h('button',{type:'button','aria-pressed':String(op[0]===value),onclick:()=>{
+    value=op[0];
+    btns.forEach((b,i)=>b.setAttribute('aria-pressed',String(options[i][0]===value)));
+    onChange(value);
+  }},op[1]));
+  wrap.append(...btns);
+  return wrap;
+}
+function toggle(label,on,onChange,o){
+  o=o||{};
+  let state=on;
+  const sw=h('button',{type:'button',role:'switch','aria-checked':String(on),class:'switch',disabled:o.disabled,onclick:()=>{
+    state=!state;sw.setAttribute('aria-checked',String(state));onChange(state);
+  }},h('span',{class:'knob'}));
+  return h('label',{class:'tg'},h('span',null,label,o.tag?h('em',{class:'soon'},o.tag):null),sw);
+}
+
+/* ----- read aloud (Web Speech API) ----- */
+const TTS=(function(){try{return 'speechSynthesis' in window&&'SpeechSynthesisUtterance' in window;}catch(e){return false;}})();
+const LANGS=[['','Auto (device default)'],['sv-SE','Svenska'],['en-US','English (US)'],['en-GB','English (UK)'],['es-ES','Español'],['fr-FR','Français'],['de-DE','Deutsch'],['it-IT','Italiano'],['pt-PT','Português'],['nb-NO','Norsk'],['da-DK','Dansk'],['fi-FI','Suomi'],['nl-NL','Nederlands'],['pl-PL','Polski'],['ru-RU','Русский'],['ja-JP','日本語'],['zh-CN','中文']];
+const BAD_VOICES=/\b(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|hysterical|junior|organ|princess|ralph|superstar|trinoids|whisper|wobble|zarvox|fred|kathy)\b/i;
+const GOOD_VOICES=/google|natural|neural|online|premium|enhanced|siri|samantha|karen|daniel|moira|alex|serena|ava|allison|zira|aria|jenny|hazel|susan|oskar|alva|klara|astrid|emma|amy|sofia|lekha/i;
+function voiceFor(lang){
+  try{
+    const all=speechSynthesis.getVoices();
+    if(!all.length||!lang)return null;
+    const want=lang.toLowerCase();
+    let c=all.filter(v=>v.lang&&v.lang.replace('_','-').toLowerCase()===want);
+    if(!c.length)c=all.filter(v=>v.lang&&v.lang.slice(0,2).toLowerCase()===want.slice(0,2));
+    if(!c.length)return null;
+    const score=v=>(GOOD_VOICES.test(v.name)?3:0)-(BAD_VOICES.test(v.name)?10:0)-(/\bmale\b/i.test(v.name)?1:0)+(v.default?0.5:0);
+    c.sort((a,b)=>score(b)-score(a));
+    return c[0];
+  }catch(e){return null;}
+}
+let speakTok=0;
+/* segs: [{t,lang}] spoken in order, {gap:ms} is silence */
+function speakSeq(segs){
+  if(!TTS)return;
+  const tok=++speakTok;
+  try{speechSynthesis.cancel();}catch(e){}
+  let i=0;
+  function next(){
+    if(tok!==speakTok||i>=segs.length)return;
+    const s=segs[i++];
+    if(s.gap){setTimeout(next,s.gap);return;}
+    const t=plain(s.t).trim();
+    if(!t){next();return;}
+    try{
+      const u=new SpeechSynthesisUtterance(t);
+      if(s.lang){u.lang=s.lang;const v=voiceFor(s.lang);if(v)u.voice=v;}
+      u.rate=1;u.pitch=1;
+      u.onend=next;u.onerror=next;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  next();
+}
+const speak=(text,lang)=>speakSeq([{t:text,lang}]);
+function stopSpeech(){speakTok++;try{if(TTS)speechSynthesis.cancel();}catch(e){}}
+const langOf=(deck,side)=>(deck&&(side==='w'?deck.langW:deck.langD))||'';
+/* Reads the whole sentence and stays silent where the blank is */
+function clozeSegs(c,cl,bi){
+  const before=[],after=[];let seen=false;
+  cl.parts.forEach(p=>{
+    if(p.blank===bi){seen=true;return;}
+    (seen?after:before).push(plain(p.v));
+  });
+  const segs=[{t:c.w,lang:langOf(c.deck,'w')}];
+  const b=before.join('').trim(),a=after.join('').trim();
+  if(b)segs.push({t:b,lang:langOf(c.deck,'d')});
+  segs.push({gap:650});
+  if(a)segs.push({t:a,lang:langOf(c.deck,'d')});
+  return segs;
+}
+function speakBtn(getSegs,cls){
+  if(!TTS)return null;
+  return h('button',{type:'button',class:'icon-btn speak '+(cls||''),'aria-label':'Read aloud',title:'Read aloud',onclick:e=>{e.stopPropagation();speakSeq(getSegs());}},icon('sound'));
+}
+
+/* ----- card images ----- */
+function cimg(id,cls){
+  const src=id&&S.images&&S.images[id];
+  return src?h('img',{class:cls||'cimg',src,alt:''}):null;
+}
+function shrink(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{
+      try{
+        const M=520;
+        let w=im.naturalWidth||im.width,hh=im.naturalHeight||im.height;
+        if(!w||!hh)throw new Error('size');
+        const k=Math.min(1,M/Math.max(w,hh));
+        w=Math.round(w*k);hh=Math.round(hh*k);
+        const cv=document.createElement('canvas');cv.width=w;cv.height=hh;
+        const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,w,hh);cx.drawImage(im,0,0,w,hh);
+        URL.revokeObjectURL(url);
+        res(cv.toDataURL('image/jpeg',0.8));
+      }catch(e){URL.revokeObjectURL(url);rej(e);}
+    };
+    im.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('image'));};
+    im.src=url;
+  });
+}
+
+/* =====================================================================
+   Data + storage
+   ===================================================================== */
+const KEY='quizlet2.v1',VKEY='quizlet2.view',DKEY='quizlet2.draft';
+const INTERVALS=[1,3,7],DAY=86400000;
+let S={decks:[],review:[],images:{},resume:null,seeded:true};
+let dirty=false,localLoaded=false,col=null,navs=0,pending=null;
+let DB=null,ME=null,CAN=true,PUB={},VOTES={},pubReady=false,pubHook=null;
+
+/* Built-in public decks: [id, title, description, langW, langD, choize, cards]. Choize decks use {curly brackets} in the definition. */
+const BUILTIN=[
+['hp','Högskoleprovet: ORD','20 ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[
+['adekvat','passande, tillräcklig'],['ambivalent','kluven, tvehågsen'],['arrogant','högdragen, övermodig'],['banal','alldaglig, platt'],
+['dogmatisk','orubblig i sin tro, obeveklig'],['efemär','kortlivad, flyktig'],['eloge','beröm, lovord'],['fatal','ödesdiger, olycksbringande'],
+['futil','meningslös, fåfängd'],['implicit','underförstådd, outtalad'],['inert','trög, overksam'],['klandra','kritisera, ogilla'],
+['lakonisk','kortfattad, fåordig'],['latent','dold, slumrande'],['pragmatisk','praktisk, sakinriktad'],['rudimentär','outvecklad, grundläggande'],
+['stringent','sammanhängande, strikt'],['trivial','obetydlig, vardaglig'],['verifiera','bekräfta, styrka'],['vag','oklar, otydlig']]],
+
+['eu-cap','Europas huvudstäder','Vilken stad är huvudstad i vilket land? Blanks gör att du tränar båda hållen.','sv-SE','sv-SE',true,[
+['Paris','{Huvudstaden} i {Frankrike}'],['Berlin','{Huvudstaden} i {Tyskland}'],['Madrid','{Huvudstaden} i {Spanien}'],['Rom','{Huvudstaden} i {Italien}'],
+['Lissabon','{Huvudstaden} i {Portugal}'],['London','{Huvudstaden} i {Storbritannien}'],['Dublin','{Huvudstaden} i {Irland}'],['Bryssel','{Huvudstaden} i {Belgien}'],
+['Amsterdam','{Huvudstaden} i {Nederländerna}'],['Bern','{Huvudstaden} i {Schweiz}'],['Wien','{Huvudstaden} i {Österrike}'],['Prag','{Huvudstaden} i {Tjeckien}'],
+['Warszawa','{Huvudstaden} i {Polen}'],['Budapest','{Huvudstaden} i {Ungern}'],['Köpenhamn','{Huvudstaden} i {Danmark}'],['Oslo','{Huvudstaden} i {Norge}'],
+['Helsingfors','{Huvudstaden} i {Finland}'],['Stockholm','{Huvudstaden} i {Sverige}'],['Aten','{Huvudstaden} i {Grekland}'],['Reykjavik','{Huvudstaden} i {Island}'],
+['Vilnius','{Huvudstaden} i {Litauen}'],['Riga','{Huvudstaden} i {Lettland}'],['Tallinn','{Huvudstaden} i {Estland}'],['Bukarest','{Huvudstaden} i {Rumänien}'],
+['Sofia','{Huvudstaden} i {Bulgarien}'],['Belgrad','{Huvudstaden} i {Serbien}'],['Zagreb','{Huvudstaden} i {Kroatien}']]],
+
+['world-cap','Världens huvudstäder','Huvudstäder utanför Europa.','sv-SE','sv-SE',true,[
+['Tokyo','{Huvudstaden} i {Japan}'],['Peking','{Huvudstaden} i {Kina}'],['Seoul','{Huvudstaden} i {Sydkorea}'],['New Delhi','{Huvudstaden} i {Indien}'],
+['Bangkok','{Huvudstaden} i {Thailand}'],['Jakarta','{Huvudstaden} i {Indonesien}'],['Kairo','{Huvudstaden} i {Egypten}'],['Nairobi','{Huvudstaden} i {Kenya}'],
+['Abuja','{Huvudstaden} i {Nigeria}'],['Addis Abeba','{Huvudstaden} i {Etiopien}'],['Rabat','{Huvudstaden} i {Marocko}'],['Washington D.C.','{Huvudstaden} i {USA}'],
+['Ottawa','{Huvudstaden} i {Kanada}'],['Mexico City','{Huvudstaden} i {Mexiko}'],['Brasília','{Huvudstaden} i {Brasilien}'],['Buenos Aires','{Huvudstaden} i {Argentina}'],
+['Lima','{Huvudstaden} i {Peru}'],['Canberra','{Huvudstaden} i {Australien}'],['Wellington','{Huvudstaden} i {Nya Zeeland}'],['Ankara','{Huvudstaden} i {Turkiet}'],
+['Teheran','{Huvudstaden} i {Iran}'],['Moskva','{Huvudstaden} i {Ryssland}'],['Kyiv','{Huvudstaden} i {Ukraina}']]],
+
+['se-geo','Sveriges geografi','Sjöar, berg, landsdelar och städer.','sv-SE','sv-SE',true,[
+['Vänern','Sveriges {största} sjö'],['Vättern','Sveriges {näst största} sjö'],['Mälaren','Sveriges {tredje största} sjö'],['Kebnekaise','Sveriges {högsta} berg'],
+['Gotland','Sveriges {största} ö'],['Stockholm','Sveriges {huvudstad}'],['Götaland, Svealand och Norrland','Sveriges tre {landsdelar}'],['Landskap','Sverige har {25} landskap'],
+['Län','Sverige har {21} län'],['Göteborg','Sveriges {näst största} stad'],['Malmö','Sveriges {tredje största} stad'],['Skåne','Sveriges {sydligaste} landskap'],['Lappland','Sveriges {största} landskap']]],
+
+['se-hist','Svensk historia: årtal','Viktiga händelser och när de hände.','sv-SE','sv-SE',true,[
+['Kalmarunionen','Bildades år {1397}'],['Digerdöden','Kom till Sverige omkring år {1350}'],['Stockholms blodbad','Ägde rum år {1520}'],['Gustav Vasa','Valdes till kung år {1523}'],
+['Trettioåriga kriget','Sverige deltog {1630}–{1648}'],['Gustav II Adolf','Stupade vid {Lützen} år {1632}'],['Karl XII','Dog år {1718}'],['Frihetstiden','Varade {1718}–{1772}'],
+['Gustav III:s statskupp','Genomfördes år {1772}'],['Unionen med Norge','Varade {1814}–{1905}'],['Nobelpriset','Delades ut första gången år {1901}'],['Folkpensionen','Infördes år {1913}'],
+['Åttatimmarsdagen','Infördes år {1919}'],['Allmän rösträtt','Kvinnor fick rösta i riksdagsval första gången {1921}'],['Nya regeringsformen','Trädde i kraft år {1975}']]],
+
+['samhalle','Samhällskunskap: så styrs Sverige','Demokrati, riksdag, grundlagar och kommun.','sv-SE','sv-SE',true,[
+['Riksdagen','Sveriges {lagstiftande} församling med {349} ledamöter'],['Regeringen','Leds av {statsministern} och styr riket'],['Valperiod','Riksdagsval hålls vart {fjärde} år'],
+['Rösträtt','I riksdagsval får man rösta från {18} års ålder'],['Yttrandefrihet','Rätten att fritt uttrycka {åsikter}, skyddad i {grundlag}'],
+['Tryckfrihetsförordningen','Grundlag som skyddar {tryckfriheten}'],['Regeringsformen','Grundlag som beskriver {hur Sverige styrs}'],['Demokrati','Folkstyre, där makten utgår från {folket}'],
+['Proportionellt valsystem','Partierna får platser i förhållande till {antalet röster}'],['Kommun','Ansvarar bland annat för {skola} och {äldreomsorg}'],
+['Region','Ansvarar främst för {sjukvård}'],['EU','Sverige blev medlem år {1995}'],['Monarki','Sverige är en {konstitutionell} monarki med {kung} som statschef'],
+['Allemansrätten','Rätten att vistas i {naturen} utan att {störa} eller {förstöra}']]],
+
+['bio','Biologi: cellen och livets processer','Organeller, fotosyntes, cellandning och celldelning.','sv-SE','sv-SE',true,[
+['Cellkärna','Innehåller cellens {DNA} och styr cellens verksamhet'],['Mitokondrie','Cellens {kraftverk} som bildar energi i form av {ATP}'],['Ribosom','Här tillverkas {proteiner}'],
+['Kloroplast','Här sker {fotosyntesen} i växtceller'],['Cellvägg','Ger växtceller stadga och finns inte hos {djurceller}'],['Cellmembran','Styr vad som tar sig {in} och {ut} ur cellen'],
+['Lysosom','Bryter ner {avfall} och uttjänta cellstrukturer'],['Golgiapparat','Paketerar och skickar vidare {proteiner}'],['Vakuol','Lagrar {vatten} och näring i växtceller'],
+['Cytoplasma','Geléartad massa som fyller {cellen} och omger organellerna'],['Fotosyntes','Växter omvandlar {koldioxid} och {vatten} till {socker} och {syre}'],
+['Cellandning','Socker och {syre} omvandlas till {energi}, koldioxid och vatten'],['DNA','Bär på {arvsanlagen}, ordnat i {kromosomer}'],
+['Mitos','Celldelning där två {identiska} celler bildas'],['Meios','Celldelning som bildar {könsceller}']]],
+
+['elements','Kemi: grundämnen','Kemiska tecken och deras svenska namn.','','sv-SE',false,[
+['H','Väte'],['He','Helium'],['Li','Litium'],['C','Kol'],['N','Kväve'],['O','Syre'],['F','Fluor'],['Ne','Neon'],['Na','Natrium'],['Mg','Magnesium'],
+['Al','Aluminium'],['Si','Kisel'],['P','Fosfor'],['S','Svavel'],['Cl','Klor'],['K','Kalium'],['Ca','Kalcium'],['Fe','Järn'],['Cu','Koppar'],['Zn','Zink'],
+['Ag','Silver'],['Sn','Tenn'],['Au','Guld'],['Hg','Kvicksilver'],['Pb','Bly']]],
+
+['math','Matematik: formler och regler','Vanliga formler. Potenser skrivs med ^ (x^2 betyder x i kvadrat).','sv-SE','sv-SE',false,[
+['Pythagoras sats','a^2 + b^2 = c^2'],['Area av cirkel','π · r^2'],['Omkrets av cirkel','2 · π · r'],['Volym av klot','4 · π · r^3 / 3'],['Volym av kon','π · r^2 · h / 3'],
+['Derivatan av x^n','n · x^(n−1)'],['Derivatan av e^x','e^x'],['Derivatan av ln x','1/x'],['Primitiv funktion till 1/x','ln|x| + C'],
+['Trigonometriska ettan','sin^2 x + cos^2 x = 1'],['Andragradsekvationen x^2 + px + q = 0','x = −p/2 ± √((p/2)^2 − q)'],['Medelvärde','Summan av alla värden delat med antalet värden'],
+['Median','Det mittersta värdet när värdena står i storleksordning'],['Sannolikhet','Antalet gynnsamma utfall delat med antalet möjliga utfall']]],
+
+['en-basic','Engelska: vardagsord','Svenska ord till engelska. Flera rätta svar skiljs med komma.','sv-SE','en-US',false,[
+['hus','house'],['bil','car'],['hund','dog'],['katt','cat'],['vatten','water'],['bröd','bread'],['bok','book'],['skola','school'],['vän','friend'],['familj','family'],
+['glad','happy'],['ledsen','sad'],['snabb','fast, quick'],['långsam','slow'],['stor','big, large'],['liten','small, little'],['ny','new'],['gammal','old'],['varm','warm, hot'],['kall','cold'],
+['äta','eat'],['dricka','drink'],['sova','sleep'],['springa','run'],['läsa','read'],['skriva','write'],['fråga','ask'],['svara','answer, reply'],['glömma','forget'],['minnas','remember']]],
+
+['en-irreg','Engelska: oregelbundna verb','Infinitiv till imperfekt och particip. Skriv t.ex. went, gone.','en-US','en-US',false,[
+['be','was/were, been'],['begin','began, begun'],['break','broke, broken'],['bring','brought, brought'],['buy','bought, bought'],['choose','chose, chosen'],['come','came, come'],
+['do','did, done'],['drink','drank, drunk'],['drive','drove, driven'],['eat','ate, eaten'],['fall','fell, fallen'],['find','found, found'],['fly','flew, flown'],
+['forget','forgot, forgotten'],['give','gave, given'],['go','went, gone'],['know','knew, known'],['see','saw, seen'],['sing','sang, sung'],['swim','swam, swum'],
+['take','took, taken'],['write','wrote, written']]],
+
+['es-basic','Spanska: grundord','Vanliga spanska ord med svensk översättning.','es-ES','sv-SE',false,[
+['hola','hej'],['adiós','hejdå'],['gracias','tack'],['por favor','snälla'],['sí','ja'],['no','nej'],['agua','vatten'],['pan','bröd'],['casa','hus'],['perro','hund'],
+['gato','katt'],['libro','bok'],['amigo','vän'],['familia','familj'],['escuela','skola'],['comer','äta'],['beber','dricka'],['dormir','sova'],['hablar','prata'],['vivir','leva, bo'],
+['grande','stor'],['pequeño','liten'],['nuevo','ny'],['viejo','gammal'],['bueno','bra'],['malo','dålig'],['hoy','idag'],['mañana','imorgon'],['ayer','igår'],['siempre','alltid'],['nunca','aldrig']]],
+
+['de-basic','Tyska: grundord','Vanliga tyska ord med svensk översättning.','de-DE','sv-SE',false,[
+['das Haus','hus'],['der Hund','hund'],['die Katze','katt'],['das Wasser','vatten'],['das Brot','bröd'],['das Buch','bok'],['die Schule','skola'],['der Freund','vän'],
+['die Familie','familj'],['danke','tack'],['bitte','snälla, varsågod'],['ja','ja'],['nein','nej'],['heute','idag'],['morgen','imorgon'],['gestern','igår'],['immer','alltid'],
+['nie','aldrig'],['groß','stor'],['klein','liten'],['neu','ny'],['alt','gammal'],['gut','bra'],['schlecht','dålig'],['essen','äta'],['trinken','dricka'],['schlafen','sova'],
+['sprechen','prata'],['wohnen','bo'],['die Straße','gata']]],
+
+['fr-basic','Franska: grundord','Vanliga franska ord med svensk översättning.','fr-FR','sv-SE',false,[
+['la maison','hus'],['le chien','hund'],['le chat','katt'],['l’eau','vatten'],['le pain','bröd'],['le livre','bok'],['l’école','skola'],['l’ami','vän'],['la famille','familj'],
+['merci','tack'],['s’il vous plaît','snälla'],['oui','ja'],['non','nej'],['aujourd’hui','idag'],['demain','imorgon'],['hier','igår'],['toujours','alltid'],['jamais','aldrig'],
+['grand','stor'],['petit','liten'],['nouveau','ny'],['vieux','gammal'],['bon','bra'],['mauvais','dålig'],['manger','äta'],['boire','dricka'],['dormir','sova'],['parler','prata']]]
+];
+
+function migrate(){
+  const changed=[];
+  S.decks.slice().forEach(d=>{
+    if(!d.example)return;
+    if(d.stats&&(d.stats.matchPlays||(d.stats.tests||[]).length)){delete d.example;changed.push(d);}
+    else removeDeck(d.id);
+  });
+  return changed;
+}
+function lsSave(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function lsLoad(){try{const t=localStorage.getItem(KEY);return t?JSON.parse(t):null;}catch(e){return null;}}
+
+const dq={};
+function dbQueue(id,data,path){
+  if(!path&&!col)return;
+  if(path&&!DB)return;
+  const e=dq[id]||(dq[id]={});
+  e.path=path||null;
+  e.data=data;clearTimeout(e.timer);
+  e.timer=setTimeout(()=>dbFlush(id),350);
+}
+async function dbFlush(id){
+  const e=dq[id];
+  if(!e||(!e.path&&!col))return;
+  if(e.busy){e.timer=setTimeout(()=>dbFlush(id),250);return;}
+  e.busy=true;
+  const data=e.data;
+  try{
+    const ref=e.path?DB.doc(e.path):col.doc(id);
+    if(data===null)await ref.delete();
+    else await ref.set(data);
+  }catch(err){/* local copy stays */}
+  e.busy=false;
+  if(e.data!==data){clearTimeout(e.timer);dbFlush(id);}
+}
+const metaDoc=()=>({review:clone(S.review),resume:S.resume?clone(S.resume):null,seeded:true});
+function touchDeck(d){dirty=true;lsSave();dbQueue('d_'+d.id,clone(d));}
+function touchMeta(){dirty=true;lsSave();dbQueue('meta',metaDoc());}
+function usedImages(){
+  const s=new Set();
+  S.decks.forEach(d=>d.cards.forEach(c=>{if(c.wi)s.add(c.wi);if(c.di)s.add(c.di);}));
+  return s;
+}
+function syncImages(fresh){
+  const used=usedImages();
+  Object.keys(S.images).forEach(id=>{
+    if(!used.has(id)){delete S.images[id];dbQueue('i_'+id,null);}
+  });
+  (fresh||[]).forEach(id=>{if(used.has(id)&&S.images[id])dbQueue('i_'+id,{data:S.images[id]});});
+  dirty=true;lsSave();
+}
+function removeDeck(id){
+  S.decks=S.decks.filter(d=>d.id!==id);
+  S.review=S.review.filter(r=>r.deck!==id);
+  dbQueue('d_'+id,null);dbQueue('meta',metaDoc());
+  syncImages();
+}
+const deckById=id=>S.decks.find(d=>d.id===id);
+function pruneReview(silent){
+  const n=S.review.length;
+  S.review=S.review.filter(r=>{const d=deckById(r.deck);return d&&d.cards.some(c=>c.id===r.card);});
+  if(!silent&&S.review.length!==n)touchMeta();
+}
+const sc=(deck,c)=>({id:c.id,w:c.w,d:c.d,wi:c.wi,di:c.di,deck});
+
+/* ----- continue where you left off ----- */
+const RESUME_NAMES={flash:'Flashcards',write:'Write',learn:'Learn'};
+function setResume(name,deckId,label,data){
+  S.resume={name,id:deckId,at:Date.now(),label,data:data||{}};touchMeta();
+}
+function clearResume(name,deckId){
+  if(S.resume&&(!name||(S.resume.name===name&&S.resume.id===deckId))){S.resume=null;touchMeta();}
+}
+function resumeFor(name,id){
+  const r=S.resume;
+  return(r&&r.name===name&&r.id===id&&deckById(id))?r:null;
+}
+
+/* ----- spaced repetition: a missed card returns after 1, 3 and 7 days ----- */
+function markWrong(c){
+  const k=c.deck.id+':'+c.id,now=Date.now();
+  const e=S.review.find(r=>r.k===k);
+  if(!e){S.review.push({k,deck:c.deck.id,card:c.id,step:0,due:now,last:now});touchMeta();return;}
+  if((e.step||0)===0&&(e.due||0)<=now)return;
+  e.step=0;e.due=now;e.last=now;touchMeta();
+}
+function markRight(c){
+  const k=c.deck.id+':'+c.id,e=S.review.find(r=>r.k===k),now=Date.now();
+  if(!e||(e.due||0)>now)return;
+  e.step=(e.step||0)+1;e.last=now;
+  if(e.step>INTERVALS.length)S.review=S.review.filter(r=>r!==e);
+  else e.due=now+INTERVALS[e.step-1]*DAY;
+  touchMeta();
+}
+function reviewItems(forDeck,all){
+  const now=Date.now(),out=[];
+  S.review.forEach(r=>{
+    if(forDeck&&r.deck!==forDeck)return;
+    if(!all&&(r.due||0)>now)return;
+    const d=deckById(r.deck);if(!d)return;
+    const c=d.cards.find(x=>x.id===r.card);if(!c)return;
+    out.push({deck:d,card:c,key:r.k,e:r});
+  });
+  return out;
+}
+function nextDue(){
+  const now=Date.now();let m=null,n=0;
+  S.review.forEach(r=>{if((r.due||0)>now){n++;if(m===null||r.due<m)m=r.due;}});
+  return{n,at:m};
+}
+function whenLabel(ms){
+  const d=Math.ceil((ms-Date.now())/DAY);
+  return d<=0?'later today':d===1?'tomorrow':'in '+d+' days';
+}
+const stepLabel=e=>(e.step||0)===0?'missed':INTERVALS[e.step-1]+'-day review';
+
+/* ----- records ----- */
+function recordMatch(deck,ms){
+  const st=deck.stats||(deck.stats={});
+  const prev=st.matchBest==null?null:st.matchBest;
+  const isBest=prev===null||ms<prev;
+  if(isBest)st.matchBest=ms;
+  st.matchPlays=(st.matchPlays||0)+1;st.matchLast=ms;
+  touchDeck(deck);
+  return{isBest,prev};
+}
+function recordTest(deck,right,total){
+  const st=deck.stats||(deck.stats={});
+  st.tests=(st.tests||[]).concat([{at:Date.now(),right,total}]).slice(-20);
+  touchDeck(deck);
+}
+
+async function connectDb(){
+  let db=null,me=null,user=null;
+  try{
+    if(window.claude&&typeof window.claude.use==='function'){
+      const got=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+      db=got[0];
+      user=got[1];
+      if(user)me=await user.id();
+    }
+  }catch(e){db=null;}
+  if(db&&me){
+    DB=db;ME=me;
+    try{if(user&&typeof user.can==='function'){const c=await user.can('data.write');CAN=c!==false;}}catch(e){}
+    try{
+      const c=db.collection('data/users/'+me);
+      const snap=await c.get();
+      const remoteDecks=[],remoteImgs={};let remoteMeta=null;
+      snap.docs.forEach(s=>{
+        const v=s.data();if(!v)return;
+        if(s.id==='meta')remoteMeta=clone(v);
+        else if(s.id.indexOf('d_')===0)remoteDecks.push(clone(v));
+        else if(s.id.indexOf('i_')===0&&v.data)remoteImgs[s.id.slice(2)]=v.data;
+      });
+      col=c;
+      if(remoteDecks.length||remoteMeta){
+        if(!dirty){
+          S.decks=remoteDecks;
+          S.review=(remoteMeta&&Array.isArray(remoteMeta.review))?remoteMeta.review:[];
+          S.images=remoteImgs;
+          S.resume=(remoteMeta&&remoteMeta.resume)||null;
+        }else{
+          if(!S.resume&&remoteMeta&&remoteMeta.resume)S.resume=remoteMeta.resume;
+          const have=new Set(S.decks.map(d=>d.id));
+          remoteDecks.forEach(d=>{if(!have.has(d.id))S.decks.push(d);});
+          const keys=new Set(S.review.map(r=>r.k));
+          ((remoteMeta&&remoteMeta.review)||[]).forEach(r=>{if(!keys.has(r.k))S.review.push(r);});
+          Object.keys(remoteImgs).forEach(id=>{if(!S.images[id])S.images[id]=remoteImgs[id];});
+          S.decks.forEach(d=>dbQueue('d_'+d.id,clone(d)));
+          Object.keys(S.images).forEach(id=>dbQueue('i_'+id,{data:S.images[id]}));
+          dbQueue('meta',metaDoc());
+        }
+      }else{
+        S.decks.forEach(d=>dbQueue('d_'+d.id,clone(d)));
+        Object.keys(S.images).forEach(id=>dbQueue('i_'+id,{data:S.images[id]}));
+        dbQueue('meta',metaDoc());
+      }
+    }catch(e){col=null;}
+  }
+  S.seeded=true;
+  migrate().forEach(touchDeck);
+  startPublic();
+  pruneReview(true);
+  if(!col&&!localLoaded)lsSave();
+  if(pending&&navs===0&&(!pending.id||deckById(pending.id))){
+    const pv=pending;pending=null;
+    go(pv.name,Object.assign({},pv,{restore:pv.name==='edit',resume:!!resumeFor(pv.name,pv.id)&&!pv.review}));
+  }else softRefresh();
+}
+
+/* =====================================================================
+   Router (remembers where you were when the page reloads)
+   ===================================================================== */
+let view={name:'home'},keyFn=null,leave=[];
+const setKeys=fn=>{keyFn=fn;};
+const onLeave=fn=>{leave.push(fn);};
+document.addEventListener('keydown',e=>{if(keyFn&&!e.metaKey&&!e.ctrlKey&&!e.altKey)keyFn(e);});
+function saveView(){
+  try{sessionStorage.setItem(VKEY,JSON.stringify({name:view.name,id:view.id||null,review:!!view.review}));}catch(e){}
+}
+function loadView(){
+  try{return JSON.parse(sessionStorage.getItem(VKEY)||'null');}catch(e){return null;}
+}
+function go(name,params){
+  leave.forEach(f=>{try{f();}catch(e){}});leave=[];keyFn=null;stopSpeech();navs++;
+  view=Object.assign({name},params||{});
+  saveView();
+  render();
+  window.scrollTo(0,0);
+}
+function render(){
+  app.replaceChildren();
+  const fn=VIEWS[view.name]||VIEWS.home;
+  try{
+    app.append(fn(view));
+  }catch(err){
+    try{console.error(err);}catch(e){}
+    app.replaceChildren(h('div',{class:'wrap view'},h('div',{class:'intro'},
+      h('h2',null,'Something went wrong'),h('p',null,String((err&&err.message)||err)),
+      btn('Back to the start',{cls:'primary',onclick:()=>go('home')}))));
+  }
+}
+function softRefresh(){
+  if(view.name==='home'||view.name==='deck')render();
+}
+function missing(){
+  view={name:'home'};saveView();
+  return homeView();
+}
+function studyBar(title,backLabel,backFn){
+  return h('div',{class:'sbar'},btn(backLabel,{cls:'link',icon:'back',onclick:backFn}),h('h1',{class:'sbar-t'},title),h('span'));
+}
+function clozeNode(parts,hide,answerLen){
+  const f=document.createDocumentFragment();
+  parts.forEach(p=>{
+    if(p.blank===hide){
+      f.append(h('span',{class:'blank',role:'img','aria-label':'blank',style:'width:'+Math.max(4,Math.min(22,answerLen+1))+'ch'}));
+    }else f.append(rich(p.v));
+  });
+  return f;
+}
+/* Editor preview: shows blanks as highlighted words so it is clear what will be hidden */
+function previewNode(s){
+  const f=document.createDocumentFragment();
+  parseCloze(s).parts.forEach(p=>{
+    if(p.blank!==undefined)f.append(h('span',{class:'pv-blank'},rich(p.v)));
+    else f.append(rich(p.v));
+  });
+  return f;
+}
+
+/* =====================================================================
+   Home
+   ===================================================================== */
+const ART='<svg class="art" viewBox="0 0 420 300" aria-label="A stack of flashcards. Use the arrow buttons to look through them.">'+
+'<g transform="rotate(-9 210 150)"><rect x="70" y="50" width="280" height="190" rx="18" class="c3"/></g>'+
+'<g transform="rotate(5 210 150)"><rect x="70" y="50" width="280" height="190" rx="18" class="c2"/></g>'+
+'<g transform="rotate(-2 210 150)"><rect x="70" y="50" width="280" height="190" rx="18" class="c1"/>'+
+'<rect class="swipe" x="132" y="128" width="158" height="26" rx="3" transform="rotate(-1.5 210 140)"/>'+
+'<text x="210" y="152" text-anchor="middle" class="t1"></text>'+
+'<text x="210" y="192" text-anchor="middle" class="t2"></text>'+
+'<text x="92" y="82" class="t3"></text></g>'+
+'<g class="keybtn" id="hk-prev" role="button" tabindex="0" aria-label="Previous card"><rect x="118" y="256" width="38" height="32" rx="8" class="key"/><text x="137" y="278" text-anchor="middle" class="kt">←</text></g>'+
+'<g class="keybtn" id="hk-next" role="button" tabindex="0" aria-label="Next card"><rect x="264" y="256" width="38" height="32" rx="8" class="key"/><text x="283" y="278" text-anchor="middle" class="kt">→</text></g>'+
+'</svg>';
+function heroArt(){
+  const wrap=h('div',{class:'hero-art',html:ART});
+  const words=BUILTIN[0][6].slice(0,8).map(p=>[p[0],plain(p[1])]);
+  let i=0;
+  const t1=wrap.querySelector('.t1'),t2=wrap.querySelector('.t2'),t3=wrap.querySelector('.t3'),sw=wrap.querySelector('.swipe');
+  function paint(){
+    const p=words[i],len=p[0].length;
+    t1.textContent=p[0];t1.style.fontSize=(len>9?34:46)+'px';
+    t2.textContent=p[1];t2.style.fontSize=(p[1].length>28?14:17)+'px';
+    t3.textContent=(i+1)+' / '+words.length;
+    const w=Math.max(60,Math.min(220,len*(len>9?19:26)));
+    sw.setAttribute('width',String(w));sw.setAttribute('x',String(210-w/2));
+  }
+  function step(d){i=(i+d+words.length)%words.length;paint();}
+  [['#hk-prev',-1],['#hk-next',1]].forEach(a=>{
+    const el=wrap.querySelector(a[0]);
+    el.addEventListener('click',()=>step(a[1]));
+    el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();step(a[1]);}});
+  });
+  paint();
+  return wrap;
+}
+
+function deckTile(d){
+  return h('button',{type:'button',class:'deck',onclick:()=>go('deck',{id:d.id})},
+    d.example?h('span',{class:'tag'},'Example'):null,
+    h('h3',null,d.title),
+    d.desc?h('p',null,d.desc):null,
+    h('span',{class:'meta'},d.cards.length+(d.cards.length===1?' card':' cards')));
+}
+function homeView(){
+  const totalCards=S.decks.reduce((n,d)=>n+d.cards.length,0);
+  const hero=h('section',{class:'hero'},
+    h('div',{class:'hero-copy'},
+      h('p',{class:'eyebrow'},S.decks.length+(S.decks.length===1?' deck':' decks')+' · '+totalCards+(totalCards===1?' card':' cards')),
+      h('h1',null,'Welcome to ',h('span',{class:'mark'},'Quizlet 2.0'),'.'),
+      h('p',{class:'lead'},'To get started, create a deck of words and definitions. Then study it with flashcards, match, write, learn and test.'),
+      h('div',{class:'row'},
+        btn('Create a deck',{cls:'primary',icon:'plus',onclick:()=>go('edit')}),
+        btn('Browse public decks',{cls:'ghost',icon:'globe',onclick:()=>go('browse')}))),
+    heroArt());
+
+  pruneReview(false);
+  const items=reviewItems();
+  const nd=nextDue();
+  const decks=h('section',{class:'sec'},
+    h('div',{class:'sec-h'},h('h2',null,'Your decks'),
+      h('button',{type:'button',class:'add-round','aria-label':'Create new deck',title:'Create new deck',onclick:()=>go('edit')},icon('plus'))),
+    S.decks.length?null:h('p',{class:'sub',style:'margin-bottom:14px'},'No decks yet. Create your first one, or add one from the public decks.'),
+    (!items.length&&nd.n)?h('p',{class:'sub',style:'margin-bottom:14px'},nd.n+(nd.n===1?' card is':' cards are')+' scheduled for review. The next one is due '+whenLabel(nd.at)+'.'):null,
+    h('div',{class:'decks'},S.decks.map(deckTile),
+      h('button',{type:'button',class:'deck new',onclick:()=>go('edit')},icon('plus'),h('span',null,'New deck'))));
+
+  const root=h('div',{class:'wrap view'},hero);
+  const rs=S.resume;
+  const rd=rs&&RESUME_NAMES[rs.name]&&deckById(rs.id);
+  if(rd){
+    root.append(h('section',{class:'resume'},
+      h('div',{class:'rs-t'},h('p',{class:'eyebrow'},'Continue where you left off'),
+        h('strong',null,RESUME_NAMES[rs.name]+' · '+rd.title),h('span',{class:'sub'},rs.label||'')),
+      h('div',{class:'row'},
+        btn('Continue',{cls:'primary',icon:'next',onclick:()=>go(rs.name,{id:rd.id,resume:true})}),
+        h('button',{type:'button',class:'icon-btn','aria-label':'Dismiss',title:'Dismiss',onclick:()=>{clearResume();render();}},icon('x')))));
+  }
+  root.append(decks);
+
+  if(items.length){
+    let all=false;
+    const list=h('ul');
+    const more=h('button',{type:'button',class:'btn link',onclick:()=>{all=!all;paint();}});
+    function paint(){
+      const shown=all?items:items.slice(0,6);
+      list.replaceChildren(...shown.map(it=>h('li',{class:'rv'},
+        h('div',{class:'rv-t'},h('strong',null,rich(it.card.w)),h('span',{class:'arrow'},'→'),rich(it.card.d)),
+        h('span',{class:'rv-deck'},it.deck.title+' · '+stepLabel(it.e)),
+        h('button',{type:'button',class:'icon-btn','aria-label':'Dismiss '+plain(it.card.w),title:'Dismiss',onclick:()=>{
+          S.review=S.review.filter(r=>r.k!==it.key);touchMeta();render();
+        }},icon('x')))));
+      more.textContent=all?'Show fewer':'Show all '+items.length;
+      more.hidden=items.length<=6;
+    }
+    paint();
+    root.append(h('section',{class:'review sec'},
+      h('div',{class:'sec-h',style:'margin-bottom:0'},
+        h('div',null,h('h2',null,h('span',{class:'mark'},'Review')),
+          h('p',{class:'sub'},'Cards that are due. Get one right and it comes back after 1, 3 and 7 days before it is cleared.'+(nd.n?' '+nd.n+' more scheduled, next '+whenLabel(nd.at)+'.':''))),
+        btn('Review '+items.length+(items.length===1?' card':' cards'),{cls:'primary',icon:'write',onclick:()=>go('write',{review:true})})),
+      list,more));
+  }
+  return root;
+}
+
+/* =====================================================================
+   Deck hub
+   ===================================================================== */
+const FN=[
+  {k:'flash',t:'Flashcards',s:'Flip through the cards one at a time.',i:'cards',min:1},
+  {k:'match',t:'Match',s:'Pair words with definitions as fast as you can.',i:'match',min:2},
+  {k:'write',t:'Write',s:'Recall the answer and type it.',i:'write',min:1},
+  {k:'learn',t:'Learn',s:'Work through the deck step by step.',i:'learn',min:2},
+  {k:'test',t:'Test',s:'A mixed test built from this deck.',i:'test',min:2}
+];
+function statsPanel(d){
+  const st=d.stats;
+  const tests=(st&&st.tests)||[];
+  if(!st||(!st.matchPlays&&!tests.length))return null;
+  const cards=[];
+  if(st.matchPlays){
+    cards.push(h('div',{class:'stat-card'},
+      h('p',{class:'eyebrow'},'Match · personal best'),
+      h('div',{class:'stat-big'},fmt(st.matchBest)),
+      h('p',{class:'sub'},st.matchPlays+(st.matchPlays===1?' play':' plays')+' · last '+fmt(st.matchLast))));
+  }
+  if(tests.length){
+    const pcts=tests.map(t=>Math.round(t.right/t.total*100));
+    const last=tests[tests.length-1];
+    cards.push(h('div',{class:'stat-card'},
+      h('p',{class:'eyebrow'},'Test · history'),
+      h('div',{class:'stat-big'},Math.max.apply(null,pcts)+'%',h('span',{class:'sub',style:'font-size:14px;font-weight:500'},' best')),
+      h('div',{class:'bars',role:'img','aria-label':'Test scores, oldest to newest: '+pcts.slice(-10).join('%, ')+'%'},
+        pcts.slice(-10).map(p=>h('i',{style:'height:'+Math.max(6,p)+'%',title:p+'%'}))),
+      h('p',{class:'sub'},tests.length+(tests.length===1?' test':' tests')+' · last '+last.right+' / '+last.total)));
+  }
+  return h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Records')),h('div',{class:'stats'},cards));
+}
+function deckView(p){
+  const d=deckById(p.id);if(!d)return missing();
+  const n=d.cards.length;
+  const delBox=h('div');
+  function askDelete(){
+    delBox.replaceChildren(h('div',{class:'confirm',role:'alertdialog'},
+      h('span',null,'Delete “'+d.title+'” and its '+n+' cards?'),
+      btn('Delete',{cls:'danger',icon:'trash',onclick:()=>{removeDeck(d.id);go('home');}}),
+      btn('Keep it',{cls:'ghost',onclick:()=>delBox.replaceChildren()})));
+  }
+  const pubBox=h('div',{class:'pubbox'});
+  let pubMsg='',pubAsk=false;
+  function paintPub(){
+    if(!DB||!ME){pubBox.replaceChildren();return;}
+    const isPub=!!myPublished()[d.id];
+    const kids=[];
+    if(pubAsk){
+      kids.push(h('div',{class:'confirm',role:'alertdialog'},
+        h('span',null,'Publish “'+d.title+'” so anyone who opens this page can copy it and vote on it? Images are left out. Decks with many dislikes get hidden.'),
+        btn(isPub?'Update':'Publish',{cls:'primary',icon:'globe',onclick:()=>{
+          const err=publishDeck(d);pubAsk=false;
+          pubMsg=err||'Published. Find it under Browse public decks.';paintPub();
+        }}),
+        btn('Cancel',{cls:'ghost',onclick:()=>{pubAsk=false;paintPub();}})));
+    }else{
+      const r=h('div',{class:'row'},
+        btn(isPub?'Update public copy':'Publish',{cls:'ghost',icon:'globe',disabled:!CAN,title:CAN?'':'Publishing needs edit access',onclick:()=>{pubAsk=true;pubMsg='';paintPub();}}));
+      if(isPub)r.append(btn('Unpublish',{cls:'ghost',onclick:()=>{unpublishDeck(d.id);pubMsg='Removed from the public decks.';paintPub();}}));
+      kids.push(r);
+    }
+    if(pubMsg)kids.push(h('p',{class:'hint','aria-live':'polite'},pubMsg));
+    pubBox.replaceChildren(...kids);
+  }
+  setPubHook(paintPub);paintPub();
+  const rv=reviewItems(d.id);
+  const root=h('div',{class:'wrap view'},
+    btn('All decks',{cls:'link',icon:'back',onclick:()=>go('home')}),
+    h('div',{class:'hub-top'},
+      d.example?h('span',{class:'tag',style:'justify-self:start'},'Example'):null,
+      h('h1',null,d.title),
+      d.desc?h('p',{class:'desc'},d.desc):null,
+      h('div',{class:'chips'},h('span',{class:'tag'},n+(n===1?' card':' cards')),h('span',{class:'tag'},'Choize '+(d.choize?'on':'off'))),
+      h('div',{class:'row'},
+        btn('Edit deck',{cls:'ghost',icon:'edit',onclick:()=>go('edit',{id:d.id})}),
+        btn('Export',{cls:'ghost',icon:'export',onclick:()=>go('export',{id:d.id})}),
+        btn('Delete',{cls:'ghost',icon:'trash',onclick:askDelete})),
+      pubBox,delBox),
+    h('div',{class:'fns'},FN.map(f=>{
+      const off=n<f.min;
+      return h('button',{type:'button',class:'fn',disabled:off,onclick:()=>go(f.k,{id:d.id})},
+        h('span',{class:'fn-i'},icon(f.i)),h('h3',null,f.t),h('p',null,off?'Needs at least '+f.min+' cards.':f.s));
+    })),
+    rv.length?h('div',{class:'note-row'},
+      h('span',null,h('strong',null,rv.length+(rv.length===1?' card':' cards')),' from this deck are due for review.'),
+      btn('Review them',{cls:'hl',icon:'write',onclick:()=>go('write',{id:d.id,review:true})})):null,
+    statsPanel(d),
+    h('details',{class:'cards-list'},
+      h('summary',null,'Cards in this deck ('+n+')'),
+      h('div',{class:'cl'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
+        d.cards.map(c=>[
+          h('div',null,cimg(c.wi,'cl-img'),rich(c.w)),
+          h('div',null,cimg(c.di,'cl-img'),rich(c.d))]))));
+  return root;
+}
+
+/* =====================================================================
+   Export
+   ===================================================================== */
+function exportView(p){
+  const deck=deckById(p.id);if(!deck)return missing();
+  let sep=';';
+  const ta=h('textarea',{class:'in mono',rows:'14',readonly:true,'aria-label':'Exported cards'});
+  const note=h('p',{class:'hint','aria-live':'polite'});
+  function build(){
+    ta.value=deck.cards.map(c=>sep==='-'?c.w+' - '+c.d:c.w+sep+' '+c.d).join('\n');
+    note.textContent=deck.cards.length+' cards. Paste this into “Paste many cards at once” with the same separator to import it again. Images are not included.';
+  }
+  async function copy(){
+    try{await navigator.clipboard.writeText(ta.value);note.textContent='Copied to the clipboard.';}
+    catch(e){ta.focus();ta.select();try{document.execCommand('copy');note.textContent='Copied to the clipboard.';}catch(e2){note.textContent='Select the text and copy it by hand.';}}
+  }
+  const dlBtn=btn('Save as .txt',{cls:'ghost',icon:'export',onclick:async()=>{
+    try{
+      const dl=await window.claude.use('downloads');
+      if(!dl){note.textContent='Saving files is not available here. Use Copy instead.';return;}
+      const name=(deck.title.replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-+|-+$/g,'')||'deck')+'.txt';
+      await dl.save({filename:name,data:ta.value});
+    }catch(e){if(!e||e.code!=='declined')note.textContent='Could not save the file. Use Copy instead.';}
+  }});
+  dlBtn.hidden=!(window.claude&&typeof window.claude.use==='function');
+  build();
+  return h('div',{class:'wrap view'},
+    h('div',{class:'form'},
+      btn('Back to deck',{cls:'link',icon:'back',onclick:()=>go('deck',{id:deck.id})}),
+      h('h1',null,'Export “'+deck.title+'”'),
+      h('div',{class:'field'},h('span',{class:'lbl'},'Separator'),
+        seg([[';','; semicolon'],[':',': colon'],['-','- dash'],[',',', comma']],sep,v=>{sep=v;build();},'Separator')),
+      ta,note,
+      h('div',{class:'form-actions'},btn('Copy text',{cls:'primary',icon:'check',onclick:copy}),dlBtn)));
+}
+
+/* =====================================================================
+   Create / edit deck
+   ===================================================================== */
+function editView(p){
+  const orig=p.id?deckById(p.id):null;
+  if(p.id&&!orig)return missing();
+  const blank=()=>({id:uid(),w:'',d:''});
+  let saved=null;
+  if(p.restore){try{const o=JSON.parse(sessionStorage.getItem(DKEY)||'null');if(o&&o.forId===(p.id||null))saved=o.draft;}catch(e){}}
+  const draft=saved||(orig?clone(orig):{id:uid(),title:'',desc:'',choize:true,langW:'',langD:'',cards:[blank()],created:Date.now()});
+  if(!draft.cards||!draft.cards.length)draft.cards=[blank()];
+  draft.langW=draft.langW||'';draft.langD=draft.langD||'';
+  const newImgs=new Set();
+  if(saved){const used=usedImages();draft.cards.forEach(c=>['wi','di'].forEach(k=>{if(c[k]&&!used.has(c[k]))newImgs.add(c[k]);}));}
+  let lastField=null,saveT=null;
+  function persist(){
+    clearTimeout(saveT);
+    saveT=setTimeout(()=>{try{sessionStorage.setItem(DKEY,JSON.stringify({forId:p.id||null,draft}));}catch(e){}},300);
+  }
+  onLeave(()=>{clearTimeout(saveT);try{sessionStorage.removeItem(DKEY);}catch(e){}});
+
+  const title=h('input',{id:'f-title',class:'in',type:'text',maxlength:'80',placeholder:'e.g. Biology: parts of a cell',value:draft.title,oninput:e=>{draft.title=e.target.value;persist();}});
+  const desc=h('textarea',{id:'f-desc',class:'in',rows:'2',maxlength:'240',placeholder:'What is this deck for? (optional)',oninput:e=>{draft.desc=e.target.value;persist();}},draft.desc);
+
+  const sw=h('button',{type:'button',role:'switch',class:'switch',id:'f-choize','aria-labelledby':'choize-l','aria-checked':String(draft.choize),onclick:()=>{
+    draft.choize=!draft.choize;sw.setAttribute('aria-checked',String(draft.choize));persist();renderSlots();
+  }},h('span',{class:'knob'}));
+  const infoBtn=h('button',{type:'button','aria-label':'What is Choize?','aria-expanded':'false',onclick:()=>{
+    const o=info.classList.toggle('open');infoBtn.setAttribute('aria-expanded',String(o));
+  }},icon('info'));
+  const info=h('span',{class:'info'},infoBtn,h('span',{class:'tip',role:'tooltip'},
+    'Choize turns words in {curly brackets} into blanks. Write “Paris; {Huvudstaden} av {Frankrike}” and Write asks “Paris = ____ av Frankrike” or “Paris = Huvudstaden av ____”.'));
+  const closeInfo=e=>{if(!info.contains(e.target)){info.classList.remove('open');infoBtn.setAttribute('aria-expanded','false');}};
+  document.addEventListener('click',closeInfo);
+  onLeave(()=>document.removeEventListener('click',closeInfo));
+
+  const langSel=(id,key,label)=>{
+    const s=h('select',{id,class:'in',onchange:e=>{draft[key]=e.target.value;persist();}},LANGS.map(l=>h('option',{value:l[0]},l[1])));
+    s.value=draft[key];
+    return h('div',{class:'field'},h('label',{for:id},label),s);
+  };
+
+  const slotsBox=h('div',{class:'slots'});
+  const countEl=h('span',{class:'sub mono'});
+  const err=h('p',{class:'err',role:'alert'});
+
+  function wrapSel(inp,l,r){
+    const s=inp.selectionStart,e=inp.selectionEnd,v=inp.value;
+    if(s===e){err.textContent='Select some text in the field first, then press the button.';return;}
+    err.textContent='';
+    inp.value=v.slice(0,s)+l+v.slice(s,e)+r+v.slice(e);
+    inp.focus();inp.setSelectionRange(s+l.length,e+l.length);
+    inp.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  async function attach(c,key,file){
+    if(!file||file.type.indexOf('image/')!==0)return;
+    try{
+      const data=await shrink(file);
+      const id=uid();S.images[id]=data;newImgs.add(id);
+      c[key]=id;err.textContent='';persist();renderSlots();
+    }catch(e){err.textContent='Could not read that image. Try a PNG or JPEG.';}
+  }
+  function cell(c,side,i){
+    const imgKey=side==='w'?'wi':'di';
+    const pv=h('div',{class:'preview'});
+    const upd=()=>{
+      if(/[*{]/.test(c[side])){pv.replaceChildren(h('span',{class:'pv-l'},'Preview'),previewNode(c[side]));pv.hidden=false;}
+      else pv.hidden=true;
+    };
+    const inp=h('input',{id:side+'-'+c.id,class:'in',type:'text',placeholder:side==='w'?'Word':'Definition','aria-label':(side==='w'?'Word ':'Definition ')+(i+1),value:c[side],
+      oninput:e=>{c[side]=e.target.value;upd();persist();},
+      onfocus:()=>{lastField=inp;},
+      onpaste:e=>{
+        const items=(e.clipboardData&&e.clipboardData.items)||[];
+        for(let n=0;n<items.length;n++){
+          if(items[n].kind==='file'&&items[n].type.indexOf('image/')===0){e.preventDefault();attach(c,imgKey,items[n].getAsFile());return;}
+        }
+      },
+      onkeydown:e=>{
+        if((e.ctrlKey||e.metaKey)&&(e.key==='b'||e.key==='i')){e.preventDefault();const m=e.key==='b'?'**':'*';wrapSel(inp,m,m);return;}
+        if(e.key!=='Enter')return;
+        e.preventDefault();
+        if(side==='w'){document.getElementById('d-'+c.id).focus();return;}
+        const nx=draft.cards[i+1];
+        if(nx)document.getElementById('w-'+nx.id).focus();else addAfter(i);
+      }});
+    upd();
+    const file=h('input',{type:'file',accept:'image/*',class:'sr-only',tabindex:'-1','aria-hidden':'true',onchange:e=>{attach(c,imgKey,e.target.files[0]);}});
+    const fbtn=(label,tip,l,r,cls)=>h('button',{type:'button',class:'fmt '+(cls||''),title:tip,'aria-label':tip,onclick:()=>wrapSel(inp,l,r)},label);
+    const has=c[imgKey]&&S.images[c[imgKey]];
+    return h('div',{class:'cell c'+side},inp,pv,
+      h('div',{class:'cell-t'},
+        h('span',{class:'fmt-group'},
+          fbtn('B','Make the selected text bold','**','**','b'),
+          fbtn('I','Make the selected text italic','*','*','it'),
+          (side==='d'&&draft.choize)?fbtn('Blank','Hide the selected word when you practise (Choize)','{','}','blankbtn'):null),
+        h('button',{type:'button',class:'fmt imgb',title:'Add an image (you can also paste one)','aria-label':'Add an image to '+(side==='w'?'word ':'definition ')+(i+1),onclick:()=>file.click()},icon('image'),'Image'),
+        has?h('span',{class:'thumb'},h('img',{src:S.images[c[imgKey]],alt:''}),
+          h('button',{type:'button',class:'icon-btn sm',title:'Remove image','aria-label':'Remove image',onclick:()=>{c[imgKey]=null;persist();renderSlots();}},icon('x'))):null,
+        file));
+  }
+  function renderSlots(focusId){
+    lastField=null;
+    slotsBox.replaceChildren(...draft.cards.map(slot));
+    countEl.textContent=draft.cards.length+(draft.cards.length===1?' card':' cards');
+    persist();
+    if(focusId){const el=document.getElementById(focusId);if(el)el.focus();}
+  }
+  function addAfter(i){const c=blank();draft.cards.splice(i+1,0,c);renderSlots('w-'+c.id);}
+  function removeAt(i){
+    if(draft.cards.length===1){const c=draft.cards[0];c.w='';c.d='';c.wi=null;c.di=null;renderSlots('w-'+c.id);return;}
+    draft.cards.splice(i,1);renderSlots();
+  }
+  function slot(c,i){
+    return h('div',{class:'slot'},
+      h('span',{class:'slot-n'},String(i+1)),cell(c,'w',i),cell(c,'d',i),
+      h('div',{class:'slot-a'},
+        h('button',{type:'button',class:'icon-btn',title:'Remove this card','aria-label':'Remove card '+(i+1),onclick:()=>removeAt(i)},icon('trash'))));
+  }
+
+  /* bulk paste with an explicit separator */
+  let bulkSep=';';
+  const EX={';':'ocean; a large body of salt water\nParis; {Huvudstaden} av {Frankrike}',':':'ocean: a large body of salt water\nParis: {Huvudstaden} av {Frankrike}','-':'ocean - a large body of salt water\nParis - {Huvudstaden} av {Frankrike}',',':'ocean, a large body of salt water\nParis, {Huvudstaden} av {Frankrike}'};
+  const bulkInfo=h('p',{class:'bulk-info','aria-live':'polite'});
+  const addBulk=btn('Add cards',{cls:'ghost',icon:'plus',disabled:true,onclick:doBulk});
+  const bulk=h('textarea',{id:'bulk',class:'in mono',rows:'5',placeholder:EX[';'],oninput:updBulk});
+  function updBulk(){
+    const r=parseBulk(bulk.value,bulkSep);
+    addBulk.disabled=!r.pairs.length;
+    addBulk.lastChild.textContent=r.pairs.length?'Add '+r.pairs.length+(r.pairs.length===1?' card':' cards'):'Add cards';
+    bulkInfo.textContent=bulk.value.trim()?(r.pairs.length+' found'+(r.skipped.length?' · '+r.skipped.length+' skipped (no “'+bulkSep+'” in the line)':'')):'';
+  }
+  function doBulk(){
+    const r=parseBulk(bulk.value,bulkSep);if(!r.pairs.length)return;
+    const added=r.pairs.map(x=>({id:uid(),w:x.w,d:x.d}));
+    const kept=draft.cards.filter(c=>c.w.trim()||c.d.trim()||c.wi||c.di);
+    draft.cards=kept.concat(added);
+    bulk.value='';updBulk();renderSlots();
+  }
+
+  function leaveEdit(){
+    newImgs.forEach(id=>{delete S.images[id];});
+    if(orig)go('deck',{id:orig.id});else go('home');
+  }
+  function save(){
+    err.textContent='';
+    const t=draft.title.trim();
+    if(!t){err.textContent='Give the deck a title.';title.focus();return;}
+    const out=[];
+    for(let i=0;i<draft.cards.length;i++){
+      const c=draft.cards[i],w=c.w.trim(),d=c.d.trim();
+      if(!w&&!d&&!c.wi&&!c.di)continue;
+      if(!w||!d){err.textContent='Card '+(i+1)+' is missing its '+(w?'definition':'word')+'.';const el=document.getElementById((w?'d-':'w-')+c.id);if(el)el.focus();return;}
+      const card={id:c.id,w,d};
+      if(c.wi&&S.images[c.wi])card.wi=c.wi;
+      if(c.di&&S.images[c.di])card.di=c.di;
+      out.push(card);
+    }
+    if(!out.length){err.textContent='Add at least one card with a word and a definition.';return;}
+    let target;
+    const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,langW:draft.langW,langD:draft.langD,cards:out};
+    if(orig){Object.assign(orig,fields);target=orig;}
+    else{target=Object.assign({id:draft.id,created:draft.created},fields);S.decks.push(target);}
+    touchDeck(target);syncImages(Array.from(newImgs));pruneReview(false);
+    go('deck',{id:target.id});
+  }
+
+  const root=h('div',{class:'wrap view'},
+    h('div',{class:'form'},
+      btn(orig?'Back to deck':'All decks',{cls:'link',icon:'back',onclick:leaveEdit}),
+      h('h1',null,orig?'Edit deck':'New deck'),
+      h('div',{class:'field'},h('label',{for:'f-title'},'Title'),title),
+      h('div',{class:'field'},h('label',{for:'f-desc'},'Description'),desc),
+      h('div',{class:'setting'},
+        h('div',{class:'setting-l'},
+          h('div',{class:'row',style:'gap:4px'},h('strong',{id:'choize-l'},'Choize'),info),
+          h('p',{class:'hint'},'Fill-in-the-blank cards. Put a word in {curly brackets} and it becomes a blank when you practise.')),sw),
+      TTS?h('div',{class:'field'},h('span',{class:'lbl'},'Read aloud languages'),
+        h('div',{class:'two'},langSel('f-lw','langW','Words'),langSel('f-ld','langD','Definitions')),
+        h('p',{class:'hint'},'Used by the speaker buttons. Your device needs a voice for the language.')):null,
+      h('div',{class:'field'},
+        h('div',{class:'sec-h',style:'margin-bottom:0'},h('span',{class:'lbl'},'Cards'),countEl),
+        h('p',{class:'hint'},'Select text in a field to make it bold, italic'+(draft.choize?' or a blank':'')+'. You can also add an image to either side.'),
+        slotsBox,
+        btn('Add card',{cls:'ghost add-card',icon:'plus',onclick:()=>addAfter(draft.cards.length-1)})),
+      h('div',{class:'bulk'},
+        h('span',{class:'lbl'},'Paste many cards at once'),
+        h('p',{class:'hint'},'One card per line. Choose what sits between the word and the definition:'),
+        seg([[';','; semicolon'],[':',': colon'],['-','- dash'],[',',', comma']],bulkSep,v=>{bulkSep=v;bulk.placeholder=EX[v];updBulk();},'Separator'),
+        bulk,bulkInfo,h('div',null,addBulk)),
+      err,
+      h('div',{class:'form-actions'},
+        btn(orig?'Save changes':'Create deck',{cls:'primary',icon:'check',onclick:save}),
+        btn('Cancel',{cls:'ghost',onclick:leaveEdit}))));
+  renderSlots();
+  setTimeout(()=>{if(!orig&&!saved)title.focus();},0);
+  return root;
+}
+
+/* =====================================================================
+   Flashcards
+   ===================================================================== */
+function flashView(p){
+  const deck=deckById(p.id);if(!deck)return missing();
+  const total=deck.cards.length;
+  let order=deck.cards.slice(),i=0,flipped=false,front='w',auto=false,ft=null;
+  const fr=p.resume?resumeFor('flash',deck.id):null;
+  if(fr&&fr.data&&fr.data.i>0&&fr.data.i<total)i=fr.data.i;
+  const i0=i;
+  const face=h('div',{class:'fc-face'});
+  const inner=h('div',{class:'fc-inner'},face);
+  const card=h('div',{class:'fc',role:'button',tabindex:'0','aria-label':'Flip card'},inner);
+  const stage=h('div',{class:'fc-stage'},card);
+  const cnt=h('span',{class:'count','aria-live':'polite'});
+  const prev=h('button',{type:'button',class:'round','aria-label':'Previous card',onclick:()=>move(-1)},icon('back'));
+  const next=h('button',{type:'button',class:'round','aria-label':'Next card',onclick:()=>move(1)},icon('next'));
+  const sideShown=()=>flipped?(front==='w'?'d':'w'):front;
+  function say(){const c=order[i],s=sideShown();speak(c[s],langOf(deck,s));}
+  const spk=speakBtn(()=>[{t:order[i][sideShown()],lang:langOf(deck,sideShown())}],'big');
+  onLeave(()=>clearTimeout(ft));
+  function paintFace(){
+    const c=order[i],s=sideShown(),text=c[s],img=s==='w'?c.wi:c.di;
+    face.classList.toggle('back',flipped);
+    face.replaceChildren(h('span',{class:'fc-label'},s==='w'?'Word':'Definition'),
+      h('div',{class:'fc-body'},cimg(img,'fc-img'),h('div',{class:'fc-text '+(plain(text).length>70?'long':plain(text).length>28?'mid':'')},rich(text))));
+    cnt.textContent=(i+1)+' / '+total;
+    prev.disabled=i===0;next.disabled=i===total-1;
+  }
+  function show(n,dir){
+    clearTimeout(ft);
+    i=n;flipped=false;paintFace();
+    if(i>0&&i<total-1)setResume('flash',deck.id,'Card '+(i+1)+' of '+total,{i});
+    else if(i>=total-1&&total>1)clearResume('flash',deck.id);
+    if(dir){stage.classList.remove('in-next','in-prev');void stage.offsetWidth;stage.classList.add(dir>0?'in-next':'in-prev');}
+    if(auto)say();
+  }
+  function move(d){const n=i+d;if(n<0||n>=total)return;show(n,d);}
+  function flip(){
+    flipped=!flipped;
+    inner.classList.remove('turn');void inner.offsetWidth;inner.classList.add('turn');
+    clearTimeout(ft);ft=setTimeout(paintFace,140);
+    if(auto)say();
+  }
+  let sx=0,sy=0,swiped=false;
+  stage.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY;swiped=false;});
+  stage.addEventListener('pointerup',e=>{
+    const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5){swiped=true;move(dx<0?1:-1);}
+  });
+  card.addEventListener('click',()=>{if(swiped){swiped=false;return;}flip();});
+  setKeys(e=>{
+    const t=e.target.tagName;
+    if(e.key==='ArrowLeft'){e.preventDefault();move(-1);}
+    else if(e.key==='ArrowRight'){e.preventDefault();move(1);}
+    else if((e.key===' '||e.key==='Enter'||e.key==='ArrowUp'||e.key==='ArrowDown')&&t!=='BUTTON'&&t!=='INPUT'&&t!=='SELECT'){e.preventDefault();flip();}
+  });
+  const opts=h('div',{class:'opts'},
+    seg([['w','Word first'],['d','Definition first']],front,v=>{front=v;show(i);},'Which side shows first'),
+    toggle('Shuffle',false,on=>{order=on?shuffle(deck.cards):deck.cards.slice();show(0);}),
+    TTS?toggle('Read aloud automatically',false,on=>{auto=on;if(on)say();else stopSpeech();}):null);
+  show(i0);
+  return h('div',{class:'wrap view'},
+    studyBar('Flashcards · '+deck.title,'Back',()=>go('deck',{id:deck.id})),
+    stage,
+    h('div',{class:'fc-nav'},prev,h('div',{class:'cnt-wrap'},cnt,spk),next),
+    opts,
+    h('p',{class:'center-hint desk-only'},'← → to move · Space to flip'),
+    h('p',{class:'center-hint'},'Tap the card to flip it. Swipe left or right to change card.'));
+}
+
+/* =====================================================================
+   Match engine + view (words on the left, definitions on the right)
+   ===================================================================== */
+function matchEngine(box,cards,o){
+  o=o||{};
+  const per=pairsPerRound(cards.length);
+  const rounds=chunk(shuffle(cards),per);
+  let ri=0,sel=null,busy=false,tiles=[],left=0,wrongTries=0,dead=false;
+  const t0=Date.now(),mistakes=new Set();
+  const roundEl=h('span'),missEl=h('span'),timeEl=h('span',{class:'mono'},'0:00');
+  const bestEl=o.best!=null?h('span',{class:'mono'},'Best '+fmt(o.best)):null;
+  const listL=h('div',{class:'mlist'}),listR=h('div',{class:'mlist'});
+  const grid=h('div',{class:'mgrid'},
+    h('div',{class:'mcol'},h('p',{class:'mcol-h'},'Words'),listL),
+    h('div',{class:'mcol'},h('p',{class:'mcol-h'},'Definitions'),listR));
+  box.replaceChildren(h('div',{class:'mbar'},roundEl,missEl,bestEl,timeEl),grid);
+  const tick=setInterval(()=>{timeEl.textContent=fmt(Date.now()-t0);},250);
+  function start(){
+    const r=rounds[ri];
+    const ws=shuffle(r.map(c=>({kind:'w',card:c,text:c.w,img:c.wi})));
+    const ds=shuffle(r.map(c=>({kind:'d',card:c,text:c.d,img:c.di})));
+    tiles=ws.concat(ds);
+    tiles.forEach((t,n)=>{
+      t.done=false;
+      t.el=h('button',{type:'button',class:'tile k-'+t.kind,onclick:()=>pick(t)},
+        h('span',{class:'kc'},String((n+1)%10)),h('span',{class:'tt'},cimg(t.img,'t-img'),h('span',null,rich(t.text))));
+    });
+    listL.replaceChildren(...ws.map(t=>t.el));
+    listR.replaceChildren(...ds.map(t=>t.el));
+    left=r.length;sel=null;busy=false;
+    roundEl.textContent=rounds.length>1?'Round '+(ri+1)+' of '+rounds.length:'Match the pairs';
+    missEl.textContent=wrongTries+(wrongTries===1?' mistake':' mistakes');
+  }
+  function pick(t){
+    if(dead||busy||t.done)return;
+    if(sel===t){t.el.classList.remove('sel');sel=null;return;}
+    if(!sel||sel.kind===t.kind){
+      if(sel)sel.el.classList.remove('sel');
+      sel=t;t.el.classList.add('sel');return;
+    }
+    const a=sel,b=t;sel=null;
+    a.el.classList.remove('sel');
+    if(a.card===b.card){
+      a.done=b.done=true;a.el.disabled=b.el.disabled=true;
+      a.el.classList.add('ok');b.el.classList.add('ok');
+      left--;
+      setTimeout(()=>{
+        if(dead)return;
+        [a,b].forEach(x=>{x.el.classList.remove('ok');x.el.classList.add('done');});
+        if(left===0)nextRound();
+      },520);
+    }else{
+      busy=true;wrongTries++;
+      mistakes.add(a.card.id);mistakes.add(b.card.id);
+      markWrong(a.card);markWrong(b.card);
+      missEl.textContent=wrongTries+(wrongTries===1?' mistake':' mistakes');
+      a.el.classList.add('bad');b.el.classList.add('bad');
+      setTimeout(()=>{
+        if(dead)return;
+        a.el.classList.remove('bad');b.el.classList.remove('bad');busy=false;
+      },480);
+    }
+  }
+  function nextRound(){
+    ri++;
+    if(ri<rounds.length){start();return;}
+    clearInterval(tick);
+    cards.forEach(c=>{if(!mistakes.has(c.id))markRight(c);});
+    if(o.onDone)o.onDone({mistakes,wrongTries,ms:Date.now()-t0});
+  }
+  function onKey(e){
+    if(!/^[0-9]$/.test(e.key))return;
+    const idx=e.key==='0'?9:(+e.key-1);
+    if(tiles[idx]){e.preventDefault();pick(tiles[idx]);}
+  }
+  start();
+  return{onKey,destroy(){dead=true;clearInterval(tick);}};
+}
+function matchView(p){
+  const deck=deckById(p.id);if(!deck)return missing();
+  const cards=deck.cards.map(c=>sc(deck,c));
+  const box=h('div');
+  let eng=null;
+  function kill(){if(eng){eng.destroy();eng=null;}setKeys(null);}
+  onLeave(kill);
+  function play(){
+    kill();
+    const best=deck.stats&&deck.stats.matchBest!=null?deck.stats.matchBest:null;
+    eng=matchEngine(box,cards,{best,onDone:r=>{
+      eng=null;setKeys(null);
+      const rec=recordMatch(deck,r.ms);
+      box.replaceChildren(h('div',{class:'result'},
+        h('p',{class:'eyebrow'},rec.isBest&&rec.prev!==null?'New personal best':'All matched'),
+        h('div',{class:'score'},h('span',{class:'mark'},fmt(r.ms))),
+        h('p',{class:'sub'},
+          rec.isBest?(rec.prev===null?'First time on the board. Beat it next round.':'You beat your old best of '+fmt(rec.prev)+'.'):'Your personal best is '+fmt(deck.stats.matchBest)+'.'),
+        h('p',{class:'sub'},r.wrongTries===0?'No mistakes. Clean run.':r.wrongTries+(r.wrongTries===1?' mistake':' mistakes')+'. Those cards are now in your review list.'),
+        h('div',{class:'row'},btn('Play again',{cls:'primary',onclick:play}),btn('Back to deck',{cls:'ghost',onclick:()=>go('deck',{id:deck.id})}))));
+    }});
+    setKeys(eng.onKey);
+  }
+  play();
+  return h('div',{class:'wrap view'},
+    studyBar('Match · '+deck.title,'Back',()=>go('deck',{id:deck.id})),
+    box,
+    h('p',{class:'center-hint desk-only'},'Press the number on a tile to select it. 0 is the tenth tile.'));
+}
+
+/* =====================================================================
+   Write engine (typed answers, Choize blanks, hints, near-miss spelling)
+   ===================================================================== */
+function writeEngine(box,cards,o){
+  const total=cards.length;
+  let queue=shuffle(cards),solved=0,fb=null,timer=null,cur=null,dead=false,tap=null;
+  if(o.resume&&Array.isArray(o.resume.q)){
+    const map=new Map(cards.map(c=>[c.id,c]));
+    const q=o.resume.q.map(id=>map.get(id)).filter(Boolean);
+    if(q.length){queue=q;solved=Math.max(0,total-new Set(q.map(c=>c.id)).size);}
+  }
+  function unTap(){if(tap){document.removeEventListener('click',tap);tap=null;}}
+  const firstTry=new Map(),attempts=new Map();
+  const fill=h('i'),bar=h('div',{class:'pbar',role:'progressbar'},fill),cnt=h('span',{class:'count'});
+  const body=h('div',{class:'wq'});
+  box.replaceChildren(h('div',{class:'wtop'},cnt,bar),body);
+  function prog(){fill.style.width=(total?solved/total*100:0)+'%';cnt.textContent=solved+' / '+total;}
+  function ask(){
+    clearTimeout(timer);unTap();fb=null;cur=null;prog();
+    if(!queue.length){finish();return;}
+    const c=queue[0],wd=o.getDir()==='wd';
+    const deck=c.deck,pSide=wd?'w':'d',aSide=wd?'d':'w';
+    const pText=wd?c.w:c.d,pImg=wd?c.wi:c.di;
+    const cz=!o.forceChoice&&wd&&o.getChoize&&o.getChoize(c)&&hasBlanks(c.d);
+    let mode,answer,opts=null,cl=null,bi=0,promptEl,segs;
+    if(cz){
+      mode='cloze';cl=parseCloze(c.d);bi=Math.floor(Math.random()*cl.n);answer=blankAnswer(cl,bi);
+      promptEl=h('div',{class:'wp-text cz'},h('strong',null,rich(c.w)),' = ',clozeNode(cl.parts,bi,answer.length));
+      segs=clozeSegs(c,cl,bi);
+    }else{
+      answer=plain(wd?c.d:c.w);
+      mode=o.forceChoice?'mc':'type';
+      if(mode==='mc'){opts=makeOptions(c,answer,wd,4);if(opts.length<2){mode='type';opts=null;}}
+      promptEl=h('div',{class:'wp-text '+lenClass(plain(pText))},rich(pText));
+      segs=[{t:pText,lang:langOf(deck,pSide)}];
+    }
+    const area=h('div',{class:'warea'});
+    cur={c,wd,answer,mode,opts,area,hints:0,aSide,cl,bi,inp:null,actions:null};
+    body.replaceChildren(
+      h('div',{class:'wprompt'},h('span',{class:'fc-label'},mode==='cloze'?'Word = definition':(wd?'Word':'Definition')),speakBtn(()=>segs,'corner'),cimg(pImg,'wp-img'),promptEl),
+      area);
+    if(o.getAuto&&o.getAuto())speakSeq(segs);
+    if(mode==='mc'){
+      area.append(h('p',{class:'ask'},'Choose the '+(wd?'definition':'word')),
+        h('div',{class:'choices'},opts.map((t,n)=>{
+          const b=h('button',{type:'button',class:'choice',onclick:()=>check(t,b)},h('span',{class:'kc'},String(n+1)),h('span',{class:'ct'},t));
+          return b;
+        })));
+    }else{
+      const inp=h('input',{id:'ans',class:'in big',type:'text',autocomplete:'off',autocapitalize:'off',spellcheck:'false','aria-label':'Your answer',
+        placeholder:mode==='cloze'?'Fill in the blank':'Type the '+(wd?'definition':'word'),
+        onkeydown:e=>{if(e.key==='Enter'){e.preventDefault();check(inp.value);}}});
+      const mask=h('div',{class:'hint-mask','aria-live':'polite'});
+      const hintBtn=btn('Hint',{cls:'ghost',icon:'bulb',onclick:()=>{
+        cur.hints++;
+        mask.textContent=maskHint(answer,cur.hints);
+        hintBtn.lastChild.textContent='Hint ('+cur.hints+')';
+        if(cur.hints>=letterCount(answer))hintBtn.disabled=true;
+        inp.focus();
+      }});
+      const actions=h('div',{class:'row'},
+        btn('Check',{cls:'primary',onclick:()=>check(inp.value)}),
+        hintBtn,
+        btn('Don’t know',{cls:'ghost',onclick:()=>check('')}));
+      cur.inp=inp;cur.actions=actions;
+      area.append(h('p',{class:'ask'},mode==='cloze'?'Fill in the blank':'Type the '+(wd?'definition':'word')),mask,inp,actions);
+      setTimeout(()=>{if(!dead&&!fb)inp.focus();},0);
+    }
+  }
+  function nearPanel(val,res){
+    const inp=cur.inp;
+    if(cur.nearEl)cur.nearEl.remove();
+    inp.classList.remove('bad','ok');inp.classList.add('near');
+    cur.actions.hidden=true;
+    const panel=h('div',{class:'fb near',role:'status'},
+      h('strong',null,'Very close'),
+      h('p',null,'Off by '+(res.dist===1?'one letter':'a couple of letters')+'. Want to try again?'),
+      h('div',{class:'row'},
+        btn('Try again',{cls:'primary',onclick:()=>{
+          panel.remove();cur.nearEl=null;inp.classList.remove('near');cur.actions.hidden=false;inp.focus();inp.select();
+        }}),
+        btn('Show answer',{cls:'ghost',onclick:()=>{panel.remove();cur.nearEl=null;finalize(false,val,true);}})));
+    cur.nearEl=panel;
+    cur.area.append(panel);
+    setTimeout(()=>{if(!dead)panel.querySelector('button').focus();},0);
+  }
+  function check(val,btnEl){
+    if(fb||!cur)return;
+    const answer=cur.answer;
+    if(cur.mode==='mc'){finalize(val!=null&&norm(val)===norm(answer),val,false,btnEl);return;}
+    const res=judge(val,answer);
+    if(res.r==='near'){nearPanel(val,res);return;}
+    finalize(res.r==='exact',val,false);
+  }
+  function finalize(ok,val,revealed,btnEl){
+    if(fb||!cur)return;
+    const c=cur.c,answer=cur.answer;
+    const hinted=ok&&cur.hints>0;
+    attempts.set(c.id,(attempts.get(c.id)||0)+1);
+    fb={ok,hinted,card:c,done:false};
+    if(!ok){firstTry.set(c.id,false);markWrong(c);}
+    else if(hinted)firstTry.set(c.id,false);
+    else if(!firstTry.has(c.id))firstTry.set(c.id,true);
+    if(cur.mode==='mc'){
+      cur.area.querySelectorAll('.choice').forEach(b=>{
+        b.disabled=true;
+        const t=b.querySelector('.ct').textContent;
+        if(norm(t)===norm(answer))b.classList.add('right');
+        else if(b===btnEl)b.classList.add('wrong');
+      });
+    }else{
+      cur.inp.disabled=true;cur.inp.classList.remove('near');cur.inp.classList.add(ok?'ok':'bad');cur.actions.hidden=true;
+    }
+    const given=val&&String(val).trim();
+    const head=ok?(hinted?'Correct, with '+cur.hints+(cur.hints===1?' hint':' hints'):'Correct'):(revealed||!given?'Here is the answer':'Not quite');
+    const panel=h('div',{class:'fb '+(ok?'ok':'bad'),role:'status'},
+      h('strong',null,head),
+      !ok&&given&&cur.mode!=='mc'?h('p',null,'You wrote: ',h('span',{class:'ans-bad'},given)):null,
+      !ok?h('p',null,'Answer: ',h('span',{class:'ans-good'},answer)):null,
+      ok&&cur.mode!=='mc'?h('p',null,h('span',{class:'ans-good'},answer)):null);
+    const cont=btn('Continue',{cls:'primary',onclick:()=>advance(ok)});
+    const acts=h('div',{class:'row'},cont);
+    if(TTS){
+      acts.append(btn('Listen',{cls:'ghost',icon:'sound',onclick:()=>speakSeq(cur.mode==='cloze'
+        ?[{t:c.w,lang:langOf(c.deck,'w')},{t:c.d,lang:langOf(c.deck,'d')}]
+        :[{t:answer,lang:langOf(c.deck,cur.aSide)}])}));
+    }
+    if(!ok&&given&&cur.mode!=='mc'){
+      acts.append(btn('I was right',{cls:'ghost',onclick:()=>{
+        if((attempts.get(c.id)||0)<=1)firstTry.set(c.id,true);
+        advance(true);
+      }}));
+    }
+    panel.append(acts,h('p',{class:'hint tapnote'},'Tap anywhere or press Space to continue.'));
+    cur.area.append(panel);
+    const mine=fb;
+    setTimeout(()=>{
+      if(dead||fb!==mine||mine.done)return;
+      tap=e=>{
+        if(!fb||fb.done)return;
+        if(e.target.closest&&e.target.closest('button,a,input,textarea,select,label'))return;
+        advance(fb.ok);
+      };
+      document.addEventListener('click',tap);
+    },350);
+    if(!ok)setTimeout(()=>{if(!dead)cont.focus();},0);
+  }
+  function advance(ok){
+    if(!fb||fb.done)return;
+    fb.done=true;clearTimeout(timer);unTap();
+    const c=fb.card,hinted=fb.hinted;queue.shift();
+    if(ok){
+      if(!firstTry.has(c.id))firstTry.set(c.id,true);
+      solved++;
+      if(!hinted)markRight(c);
+    }
+    else if(o.once)solved++;
+    else queue.push(c);
+    if(o.onProgress)o.onProgress({q:queue.map(x=>x.id),done:Math.max(0,total-new Set(queue.map(x=>x.id)).size),total});
+    ask();
+  }
+  function finish(){
+    prog();
+    const right=[],wrong=[];
+    cards.forEach(c=>(firstTry.get(c.id)===false?wrong:right).push(c));
+    if(!dead&&o.onDone)o.onDone({right,wrong,total});
+  }
+  function onKey(e){
+    const tag=e.target.tagName,typing=tag==='INPUT'||tag==='TEXTAREA',isBtn=tag==='BUTTON';
+    if(fb){if((e.key==='Enter'||e.key===' ')&&!isBtn&&!typing&&!e.repeat){e.preventDefault();advance(fb.ok);}return;}
+    if(cur&&cur.mode==='mc'&&/^[1-9]$/.test(e.key)&&!typing){
+      const n=+e.key-1;
+      if(cur.opts[n]!=null){check(cur.opts[n],cur.area.querySelectorAll('.choice')[n]);}
+    }
+  }
+  ask();
+  return{onKey,refresh(){if(!fb)ask();},destroy(){dead=true;clearTimeout(timer);unTap();}};
+}
+
+function missList(cards){
+  return h('ul',{class:'miss-list'},cards.map(c=>h('li',null,h('strong',null,rich(c.w)),h('span',{class:'arrow'},'→'),rich(c.d))));
+}
+function writeView(p){
+  let cards=[],deck=null,title='Write';
+  if(p.id){
+    deck=deckById(p.id);if(!deck)return missing();
+    title=(p.review?'Review':'Write')+' · '+deck.title;
+    cards=p.review?reviewItems(deck.id).map(it=>sc(it.deck,it.card)):deck.cards.map(c=>sc(deck,c));
+  }else{
+    title='Review';
+    cards=reviewItems().map(it=>sc(it.deck,it.card));
+  }
+  const back=()=>deck?go('deck',{id:deck.id}):go('home');
+  if(!cards.length){
+    return h('div',{class:'wrap view'},studyBar(title,'Back',back),
+      h('div',{class:'intro'},h('h2',null,'Nothing to review'),h('p',null,'Cards you get wrong come back here when they are due.'),btn('Back',{cls:'primary',onclick:back})));
+  }
+  const cfg={dir:'wd',choize:true,auto:false};
+  const choizeAvail=cards.some(c=>c.deck.choize&&hasBlanks(c.d));
+  const box=h('div');
+  let eng=null;
+  function kill(){if(eng){eng.destroy();eng=null;}setKeys(null);}
+  onLeave(kill);
+  const rs=(deck&&!p.review&&p.resume)?resumeFor('write',deck.id):null;
+  let firstStart=true;
+  function start(list){
+    kill();
+    const track=!!deck&&!p.review&&list===cards;
+    const res=(firstStart&&track&&rs)?rs.data:null;firstStart=false;
+    eng=writeEngine(box,list,{
+      resume:res,
+      onProgress:track?(s=>{if(s.q.length)setResume('write',deck.id,s.done+' of '+s.total+' done',{q:s.q});else clearResume('write',deck.id);}):null,
+      getDir:()=>cfg.dir,
+      getChoize:c=>cfg.choize&&c.deck.choize,
+      getAuto:()=>cfg.auto,
+      onDone:r=>{
+        eng=null;setKeys(null);
+        if(track)clearResume('write',deck.id);
+        box.replaceChildren(h('div',{class:'result'},
+          h('p',{class:'eyebrow'},'Round complete'),
+          h('div',{class:'score'},h('span',{class:'mark'},r.right.length+' / '+r.total)),
+          h('p',{class:'sub'},'right on the first try, without hints.'),
+          r.wrong.length?h('div',{style:'width:100%'},h('h3',{style:'margin-bottom:10px'},'Keep working on these'),missList(r.wrong)):h('p',null,'Clean sweep. Nothing to review.'),
+          h('div',{class:'row'},
+            r.wrong.length?btn('Practice the missed ones',{cls:'primary',onclick:()=>start(r.wrong)}):null,
+            btn('Go again',{cls:r.wrong.length?'ghost':'primary',onclick:()=>start(cards)}),
+            btn('Done',{cls:'ghost',onclick:back}))));
+      }});
+    setKeys(eng.onKey);
+  }
+  start(cards);
+  const opts=h('div',{class:'opts'},
+    seg([['wd','Word → Definition'],['dw','Definition → Word']],cfg.dir,v=>{cfg.dir=v;if(eng)eng.refresh();},'Direction'),
+    choizeAvail?toggle('Choize',true,on=>{cfg.choize=on;if(eng)eng.refresh();}):null,
+    TTS?toggle('Read aloud',false,on=>{cfg.auto=on;if(on)stopSpeech();}):null,
+    toggle('AI',false,()=>{},{disabled:true,tag:'Later'}));
+  const tip=(deck&&deck.choize&&!choizeAvail)?h('p',{class:'center-hint'},'Tip: put {curly brackets} around words in a definition and Choize turns them into blanks.'):null;
+  return h('div',{class:'wrap view'},studyBar(title,'Back',back),opts,h('div',{style:'height:22px'}),box,tip);
+}
+
+/* =====================================================================
+   Learn (progress is shown as a percentage; the steps stay behind the scenes)
+   ===================================================================== */
+function learnView(p){
+  const deck=deckById(p.id);if(!deck)return missing();
+  const N=deck.cards.length;
+  const sizes=sectionSizes(N);
+  let pos=0;
+  const secs=sizes.map(n=>{const s=deck.cards.slice(pos,pos+n);pos+=n;return s.map(c=>sc(deck,c));});
+  const L={sec:0,steps:0,missed:new Set(),everMissed:new Set(),dir:'wd',doneCards:0,inc:[],cor:[],again:[],t0:Date.now()};
+  const fill=h('i'),pct=h('span',{class:'mono'},'0%');
+  const cap=h('p',{class:'lcap'});
+  const box=h('div');
+  let eng=null;
+  function kill(){if(eng){eng.destroy();eng=null;}setKeys(null);}
+  onLeave(kill);
+  function head(){
+    const cur=secs[L.sec]?secs[L.sec].length:0;
+    const f=Math.min(1,(L.doneCards+cur*(L.steps/3))/N);
+    fill.style.width=(f*100)+'%';pct.textContent=Math.round(f*100)+'%';
+  }
+  const getDir=()=>L.dir;
+  const wOpts=r=>Object.assign({getDir,getChoize:c=>c.deck.choize},r);
+
+  function sLearn(){
+    kill();L.steps=0;head();
+    cap.textContent='Choose the correct answer';
+    eng=writeEngine(box,secs[L.sec],{once:true,forceChoice:true,getDir,onDone:r=>{
+      r.wrong.forEach(c=>{L.missed.add(c.id);L.everMissed.add(c.id);});
+      L.steps=1;head();
+      L.inc=secs[L.sec].filter(c=>L.missed.has(c.id));
+      L.cor=secs[L.sec].filter(c=>!L.missed.has(c.id));
+      pWC();
+    }});
+    setKeys(eng.onKey);
+  }
+  function pWC(){
+    kill();head();
+    if(!L.cor.length){L.steps=2;head();L.again=L.inc.slice();return pWI();}
+    cap.textContent='Now write the ones you knew';
+    eng=writeEngine(box,L.cor,wOpts({onDone:r=>{
+      r.wrong.forEach(c=>L.everMissed.add(c.id));
+      L.again=L.inc.concat(r.wrong.filter(c=>L.inc.indexOf(c)===-1));
+      L.steps=2;head();pWI();
+    }}));
+    setKeys(eng.onKey);
+  }
+  function pWI(){
+    kill();head();
+    if(!L.again.length)return secDone();
+    cap.textContent='Write the ones you missed';
+    eng=writeEngine(box,L.again,wOpts({onDone:()=>{L.steps=3;head();secDone();}}));
+    setKeys(eng.onKey);
+  }
+  function secDone(){
+    L.doneCards+=secs[L.sec].length;L.steps=3;
+    L.sec++;
+    if(L.sec>=secs.length){L.sec=secs.length-1;return finish();}
+    L.steps=0;L.missed=new Set();L.again=[];L.inc=[];L.cor=[];
+    setResume('learn',deck.id,Math.round(L.doneCards/N*100)+'% learned',{sec:L.sec});
+    sLearn();
+  }
+  function finish(){
+    kill();cap.textContent='';
+    fill.style.width='100%';pct.textContent='100%';
+    clearResume('learn',deck.id);
+    const missedN=L.everMissed.size;
+    box.replaceChildren(h('div',{class:'result'},
+      h('p',{class:'eyebrow'},'Deck complete'),
+      h('div',{class:'score'},h('span',{class:'mark'},'100% learned')),
+      h('p',{class:'sub'},missedN?missedN+(missedN===1?' card needed':' cards needed')+' a second pass. Total time '+fmt(Date.now()-L.t0)+'.':'No misses at all. Total time '+fmt(Date.now()-L.t0)+'.'),
+      h('div',{class:'row'},
+        btn('Learn again',{cls:'primary',onclick:()=>go('learn',{id:deck.id})}),
+        btn('Back to deck',{cls:'ghost',onclick:()=>go('deck',{id:deck.id})}))));
+  }
+
+  const root=h('div',{class:'wrap view'},
+    studyBar('Learn · '+deck.title,'Back',()=>go('deck',{id:deck.id})),
+    h('div',{class:'lhead'},
+      h('div',{class:'row',style:'justify-content:space-between'},
+        h('span',{class:'eyebrow'},'Progress'),
+        seg([['wd','Word → Definition'],['dw','Definition → Word']],L.dir,v=>{L.dir=v;if(eng&&eng.refresh)eng.refresh();},'Direction')),
+      h('div',{class:'lprog'},h('div',{class:'pbar',role:'progressbar','aria-label':'Deck learned'},fill),pct)),
+    cap,box);
+  const lr=p.resume?resumeFor('learn',deck.id):null;
+  if(lr&&lr.data&&lr.data.sec>0&&lr.data.sec<secs.length){
+    L.sec=lr.data.sec;
+    L.doneCards=sizes.slice(0,L.sec).reduce((a,b)=>a+b,0);
+  }
+  sLearn();
+  return root;
+}
+
+/* =====================================================================
+   Test
+   ===================================================================== */
+function testView(p){
+  const deck=deckById(p.id);if(!deck)return missing();
+  const N=deck.cards.length;
+  const back=()=>go('deck',{id:deck.id});
+  const root=h('div',{class:'wrap view'});
+  const czAvail=deck.choize&&deck.cards.some(c=>hasBlanks(c.d));
+  const cfg={count:Math.min(20,N),types:{tf:N>=2,mc:N>=2,wr:true,cz:czAvail},dir:'mix'};
+  const TYPE_LABEL={tf:'True / false',mc:'Multiple choice',wr:'Written',cz:'Fill in the blank'};
+  const isDesk=!!(window.matchMedia&&window.matchMedia('(hover:hover) and (pointer:fine)').matches);
+
+  function showConfig(){
+    setKeys(null);
+    const err=h('p',{class:'err',role:'alert'});
+    const count=h('input',{id:'t-count',class:'in',type:'number',min:'1',max:'200',value:String(cfg.count),
+      oninput:e=>{const v=parseInt(e.target.value,10);if(v>=1)cfg.count=Math.min(200,v);}});
+    const tests=(deck.stats&&deck.stats.tests)||[];
+    root.replaceChildren(studyBar('Test · '+deck.title,'Back',back),
+      h('div',{class:'cfg'},
+        h('h1',null,'Set up your test'),
+        tests.length?h('p',{class:'sub'},'Last result '+tests[tests.length-1].right+' / '+tests[tests.length-1].total+' · best '+Math.max.apply(null,tests.map(t=>Math.round(t.right/t.total*100)))+'%'):null,
+        h('div',{class:'field'},h('label',{for:'t-count'},'Number of questions'),count,
+          h('p',{class:'hint'},'Your deck has '+N+' cards. Ask for more and the same word comes back later in the test, spaced out.')),
+        h('div',{class:'field'},h('span',{class:'lbl'},'Question types'),
+          h('div',{class:'setting',style:'display:grid;gap:4px'},
+            ['tf','mc','wr','cz'].map(k=>{
+              const off=(k==='cz'&&!czAvail)||(N<2&&(k==='tf'||k==='mc'));
+              const note=k==='cz'?(!czAvail?' (needs Choize and {blanks})':''):(off?' (needs 2+ cards)':'');
+              return toggle(TYPE_LABEL[k]+note,cfg.types[k],on=>{cfg.types[k]=on;},{disabled:off});
+            }),
+            toggle('AI deeper questions',false,()=>{},{disabled:true,tag:'Later'}))),
+        h('div',{class:'field'},h('span',{class:'lbl'},'Direction'),
+          seg([['mix','Mixed'],['wd','Word → Definition'],['dw','Definition → Word']],cfg.dir,v=>{cfg.dir=v;},'Direction')),
+        err,
+        h('div',{class:'form-actions'},
+          btn('Start test',{cls:'primary',icon:'test',onclick:()=>{
+            const types=['tf','mc','wr','cz'].filter(k=>cfg.types[k]);
+            if(!types.length){err.textContent='Pick at least one question type.';return;}
+            cfg.count=Math.max(1,Math.min(200,parseInt(count.value,10)||cfg.count));
+            showTest(buildTest(types));
+          }}),
+          btn('Cancel',{cls:'ghost',onclick:back}))));
+    window.scrollTo(0,0);
+  }
+  /* cards are dealt in shuffled rounds, so a repeated word is always a full round away */
+  function dealCards(total){
+    const seq=[];let prevRound=null;
+    const m=Math.min(3,Math.floor(N/2));
+    while(seq.length<total){
+      let round=shuffle(deck.cards);
+      if(prevRound&&m>0){
+        const avoid=new Set(prevRound.slice(-m).map(c=>c.id));
+        const front=round.filter(c=>!avoid.has(c.id)),back=round.filter(c=>avoid.has(c.id));
+        round=front.slice(0,m).concat(back,front.slice(m));
+      }
+      seq.push(...round);prevRound=round;
+    }
+    return seq.slice(0,total);
+  }
+  function buildTest(types){
+    const nonCz=types.filter(t=>t!=='cz'),czOn=types.indexOf('cz')!==-1;
+    let k=0;
+    const qs=dealCards(cfg.count).map((c,idx)=>{
+      const card=sc(deck,c);
+      if(czOn&&hasBlanks(c.d)&&(!nonCz.length||Math.random()<0.6)){
+        const cl=parseCloze(c.d),bi=Math.floor(Math.random()*cl.n);
+        return{card,type:'cz',wd:true,prompt:c.w,cl,bi,answer:blankAnswer(cl,bi),given:null,order:idx};
+      }
+      let t=nonCz.length?nonCz[(k++)%nonCz.length]:'wr';
+      const wd=cfg.dir==='mix'?Math.random()<.5:cfg.dir==='wd';
+      const prompt=wd?c.w:c.d,answer=plain(wd?c.d:c.w);
+      const q={card,type:t,wd,prompt,answer,given:null,order:idx};
+      if(t==='mc'){q.options=makeOptions(card,answer,wd,4);if(q.options.length<2)t=q.type='wr';}
+      if(t==='tf'){
+        const wrongOnes=distractors(card,answer,wd,1);
+        if(!wrongOnes.length)t=q.type='wr';
+        else{q.isTrue=Math.random()<.5;q.shown=q.isTrue?answer:wrongOnes[0];}
+      }
+      return q;
+    });
+    const order={tf:0,mc:1,wr:2,cz:3};
+    return qs.sort((a,b)=>(order[a.type]-order[b.type])||(a.order-b.order));
+  }
+  const promptNode=q=>q.type==='cz'
+    ?h('p',{class:'qp'},h('strong',null,rich(q.prompt)),' = ',clozeNode(q.cl.parts,q.bi,q.answer.length))
+    :h('p',{class:'qp '+(plain(q.prompt).length>60?'long':'')},rich(q.prompt));
+  function showTest(qs){
+    const form=h('div');
+    const arts=[];
+    let lastType=null,warned=false,sel=0;
+    function select(i,o){
+      o=o||{};
+      i=Math.max(0,Math.min(qs.length-1,i));
+      if(arts[sel])arts[sel].classList.remove('sel');
+      sel=i;arts[i].classList.add('sel');
+      if(o.scroll!==false){try{arts[i].scrollIntoView({block:'center',behavior:'smooth'});}catch(e){}}
+      const q=qs[i];
+      if(q.input){if(isDesk||o.focus)q.input.focus({preventScroll:true});}
+      else{const a=document.activeElement;if(a&&a.tagName==='INPUT')a.blur();}
+    }
+    function choose(i,n){
+      if(sel!==i)select(i,{scroll:false});
+      const q=qs[i];
+      q.given=q.type==='mc'?q.options[n]:(n===0);
+      q.buttons.forEach((b,k)=>b.classList.toggle('picked',k===n));
+      if(isDesk)select(i+1);
+    }
+    qs.forEach((q,i)=>{
+      if(q.type!==lastType){form.append(h('p',{class:'qh'},TYPE_LABEL[q.type]));lastType=q.type;}
+      const pimg=q.type==='cz'?q.card.wi:(q.wd?q.card.wi:q.card.di);
+      const art=h('article',{class:'q',onclick:()=>{if(sel!==i)select(i,{scroll:false,focus:true});}},
+        h('div',{class:'q-top'},h('span',null,String(i+1)+' / '+qs.length)));
+      if(q.type==='mc'){
+        q.buttons=q.options.map((t,n)=>h('button',{type:'button',class:'choice',onclick:()=>choose(i,n)},h('span',{class:'kc'},String(n+1)),h('span',{class:'ct'},t)));
+        art.append(cimg(pimg,'q-img'),promptNode(q),h('p',{class:'ask'},'Choose the '+(q.wd?'definition':'word')),h('div',{class:'choices'},q.buttons));
+      }else if(q.type==='tf'){
+        q.buttons=['True','False'].map((t,n)=>h('button',{type:'button',class:'choice',onclick:()=>choose(i,n)},h('span',{class:'kc'},String(n+1)),h('span',{class:'ct'},t)));
+        art.append(h('p',{class:'ask'},'Do these belong together?'),
+          h('div',{class:'tf-line'},cimg(pimg,'q-img'),h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),q.shown),
+          h('div',{class:'choices'},q.buttons));
+      }else{
+        q.input=h('input',{class:'in',type:'text',autocomplete:'off',autocapitalize:'off',spellcheck:'false','aria-label':'Answer for question '+(i+1),
+          placeholder:q.type==='cz'?'Fill in the blank':'Type the '+(q.wd?'definition':'word'),
+          oninput:e=>{q.given=e.target.value;},
+          onfocus:()=>{if(sel!==i)select(i,{scroll:false});}});
+        art.append(cimg(pimg,'q-img'),promptNode(q),h('p',{class:'ask'},q.type==='cz'?'Fill in the blank':'Type the '+(q.wd?'definition':'word')),q.input);
+      }
+      arts.push(art);form.append(art);
+    });
+    const warn=h('p',{class:'err',role:'alert'});
+    const submit=btn('Check test',{cls:'primary',icon:'check',onclick:()=>{
+      const un=qs.filter(q=>(q.type==='wr'||q.type==='cz')?!(q.given||'').trim():q.given==null).length;
+      if(un&&!warned){warned=true;warn.textContent=un+(un===1?' question is':' questions are')+' unanswered. Press again to check anyway.';return;}
+      showResults(qs);
+    }});
+    root.replaceChildren(studyBar('Test · '+deck.title,'Quit',back),
+      h('div',{style:'max-width:760px;margin:0 auto'},form,h('div',{class:'submit-bar'},submit,warn),
+        h('p',{class:'center-hint desk-only'},'1–4 to answer · ↑ ↓ ← → to move between questions · Enter in a written answer goes to the next')));
+    setKeys(e=>{
+      const tag=e.target.tagName,typing=tag==='INPUT'||tag==='TEXTAREA',q=qs[sel];
+      if(typing){
+        if(e.key==='Enter'||e.key==='ArrowDown'){e.preventDefault();select(sel+1,{focus:true});}
+        else if(e.key==='ArrowUp'){e.preventDefault();select(sel-1,{focus:true});}
+        return;
+      }
+      if(tag==='BUTTON'&&(e.key==='Enter'||e.key===' '))return;
+      if(/^[1-9]$/.test(e.key)){
+        const n=+e.key-1;
+        if(q.buttons&&q.buttons[n]){e.preventDefault();choose(sel,n);}
+        return;
+      }
+      if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();select(sel-1);}
+      else if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();select(sel+1);}
+    });
+    window.scrollTo(0,0);
+    select(0,{scroll:false});
+  }
+  function grade(q){
+    if(q.type==='mc'){return q.given!=null&&norm(q.given)===norm(q.answer)?'exact':'wrong';}
+    if(q.type==='tf')return q.given===q.isTrue?'exact':'wrong';
+    return judge(q.given||'',q.answer).r;
+  }
+  function showResults(qs){
+    setKeys(null);
+    qs.forEach(q=>{
+      q.res=grade(q);q.ok=q.res!=='wrong';
+      if(q.ok)markRight(q.card);else markWrong(q.card);
+    });
+    const right=qs.filter(q=>q.ok).length;
+    const pctv=Math.round(right/qs.length*100);
+    recordTest(deck,right,qs.length);
+    const hist=deck.stats.tests;
+    const prevBest=hist.length>1?Math.max.apply(null,hist.slice(0,-1).map(t=>Math.round(t.right/t.total*100))):null;
+    const list=qs.map((q,i)=>{
+      let yours,correct;
+      if(q.type==='tf'){
+        yours=q.given==null?'No answer':(q.given?'True':'False');
+        correct=q.isTrue?'True':'False';
+      }else{
+        yours=(q.given&&String(q.given).trim())||'No answer';
+        correct=q.answer;
+      }
+      return h('article',{class:'q '+(q.ok?'ok':'bad')},
+        h('div',{class:'q-top'},h('span',null,(i+1)+' · '+TYPE_LABEL[q.type])),
+        q.type==='tf'?h('div',{class:'tf-line'},h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),q.shown):promptNode(q),
+        h('div',{class:'q-res '+(q.ok?'ok':'bad')},icon(q.ok?'check':'cross'),
+          h('div',null,q.ok
+            ?h('span',null,'Your answer: ',h('strong',null,yours),q.res==='near'?h('span',null,' (small typo, spelled ',h('strong',null,correct),')'):null)
+            :h('span',null,'Your answer: ',h('span',{class:'ans-bad'},yours),h('br'),'Correct: ',h('span',{class:'ans-good'},correct)))));
+    });
+    root.replaceChildren(studyBar('Test · '+deck.title,'Back',back),
+      h('div',{style:'max-width:760px;margin:0 auto'},
+        h('div',{class:'result',style:'margin:0 0 26px'},
+          h('p',{class:'eyebrow'},prevBest!==null&&pctv>prevBest?'New best score':'Test complete'),
+          h('div',{class:'score'},h('span',{class:'mark'},right+' / '+qs.length)),
+          h('p',{class:'sub'},pctv+'%'+(prevBest!==null?' · previous best '+prevBest+'%':'')+(right<qs.length?' · missed cards are scheduled for review.':' · perfect score.')),
+          h('div',{class:'row'},btn('Retake test',{cls:'primary',onclick:showConfig}),btn('Back to deck',{cls:'ghost',onclick:back}))),
+        list));
+    window.scrollTo(0,0);
+  }
+  showConfig();
+  return root;
+}
+
+/* =====================================================================
+   Public decks: built-in decks plus community decks (shared db) with likes
+   ===================================================================== */
+const HIDE_AT=-3,MAX_PUBLISHED=15,MIN_CARDS=4;
+function startPublic(){
+  if(!DB){pubReady=true;pubChanged();return;}
+  try{
+    DB.collection('pub').onSnapshot(snap=>{
+      const m={};
+      snap.docs.forEach(s=>{const v=s.data();if(v&&v.decks&&typeof v.decks==='object')m[s.id]=v.decks;});
+      PUB=m;pubReady=true;pubChanged();
+    },()=>{pubReady=true;pubChanged();});
+    DB.collection('votes').onSnapshot(snap=>{
+      const m={};
+      snap.docs.forEach(s=>{const v=s.data();if(v&&v.v&&typeof v.v==='object')m[s.id]=v.v;});
+      VOTES=m;pubChanged();
+    },()=>{});
+  }catch(e){pubReady=true;}
+}
+function pubChanged(){if(pubHook){try{pubHook();}catch(e){}}}
+function setPubHook(fn){pubHook=fn;onLeave(()=>{if(pubHook===fn)pubHook=null;});}
+
+function tally(){
+  const t={};
+  Object.keys(VOTES).forEach(u=>{
+    const mv=VOTES[u];
+    Object.keys(mv).forEach(g=>{
+      const owner=g.split('~')[0];
+      if(owner===u)return;
+      const e=t[g]||(t[g]={up:0,down:0});
+      if(mv[g]===1)e.up++;else if(mv[g]===-1)e.down++;
+    });
+  });
+  return t;
+}
+function pubItems(){
+  const t=tally(),out=[];
+  BUILTIN.forEach(b=>out.push({gid:'bi:'+b[0],builtin:true,mine:false,deck:{title:b[1],desc:b[2],langW:b[3],langD:b[4],choize:b[5],cards:b[6]},up:0,down:0,score:0,at:0}));
+  Object.keys(PUB).forEach(u=>{
+    const decks=PUB[u];
+    Object.keys(decks).forEach(k=>{
+      const d=decks[k];
+      if(!d||!Array.isArray(d.cards)||typeof d.title!=='string')return;
+      const cards=d.cards.filter(c=>Array.isArray(c)&&typeof c[0]==='string'&&typeof c[1]==='string').slice(0,500);
+      if(!cards.length)return;
+      const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,
+        langW:typeof d.langW==='string'?d.langW:'',langD:typeof d.langD==='string'?d.langD:'',at:+d.at||0};
+      const gid=u+'~'+k,v=t[gid]||{up:0,down:0};
+      out.push({gid,builtin:false,mine:u===ME,key:k,deck:clean,up:v.up,down:v.down,score:v.up-v.down,at:d.at||0});
+    });
+  });
+  return out;
+}
+const pubFind=gid=>pubItems().find(x=>x.gid===gid)||null;
+const myVote=gid=>((VOTES[ME]||{})[gid])||0;
+function castVote(gid,val){
+  if(!DB||!ME||!CAN)return;
+  const cur=Object.assign({},VOTES[ME]||{});
+  if(cur[gid]===val)delete cur[gid];else cur[gid]=val;
+  VOTES[ME]=cur;
+  dbQueue('votes_me',{v:cur},'votes/'+ME);
+  pubChanged();
+}
+const myPublished=()=>(PUB[ME]||{});
+function publishDeck(d){
+  const mine=Object.assign({},myPublished());
+  if(!mine[d.id]&&Object.keys(mine).length>=MAX_PUBLISHED)return 'You can have at most '+MAX_PUBLISHED+' public decks. Unpublish one first.';
+  if(d.cards.length<MIN_CARDS)return 'A public deck needs at least '+MIN_CARDS+' cards.';
+  mine[d.id]={title:d.title,desc:d.desc||'',cards:d.cards.map(c=>[c.w,c.d]),choize:!!d.choize,langW:d.langW||'',langD:d.langD||'',at:Date.now()};
+  if(JSON.stringify(mine).length>200000)return 'That deck is too large to publish. Try splitting it into smaller decks.';
+  PUB[ME]=mine;
+  dbQueue('pub_me',{decks:mine},'pub/'+ME);
+  pubChanged();
+  return null;
+}
+function unpublishDeck(key){
+  const mine=Object.assign({},myPublished());
+  delete mine[key];PUB[ME]=mine;
+  dbQueue('pub_me',{decks:mine},'pub/'+ME);
+  pubChanged();
+}
+function addCopy(deck){
+  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),
+    cards:deck.cards.map(c=>Array.isArray(c)?{id:uid(),w:c[0],d:c[1]}:{id:uid(),w:c.w,d:c.d})};
+  S.decks.push(d);touchDeck(d);
+  return d;
+}
+const hidden=it=>!it.builtin&&!it.mine&&it.score<=HIDE_AT;
+
+function pubTile(it){
+  return h('button',{type:'button',class:'deck',onclick:()=>go('pubdeck',{id:it.gid})},
+    h('span',{class:'tag'+(it.builtin?' hl':'')},it.builtin?'Built in':(it.mine?'Yours':'Community')),
+    h('h3',null,it.deck.title),
+    it.deck.desc?h('p',null,it.deck.desc):null,
+    h('span',{class:'meta'},it.deck.cards.length+' cards'+(it.builtin?'':' · '+(it.score>0?'+':'')+it.score)));
+}
+function browseView(){
+  let q='',cat='all',sort='top';
+  const info=h('p',{class:'sub','aria-live':'polite'});
+  const list=h('div',{class:'decks'});
+  const search=h('input',{type:'search',class:'in',placeholder:'Search decks, words or definitions',autocomplete:'off','aria-label':'Search public decks',
+    oninput:e=>{q=e.target.value;paint();}});
+  const catSeg=seg([['all','All'],['builtin','Built in'],['community','Community'],['mine','Yours']],cat,v=>{cat=v;paint();},'Show');
+  const sortSeg=seg([['top','Top rated'],['new','Newest']],sort,v=>{sort=v;paint();},'Sort community decks');
+  function match(it){
+    const toks=norm(q).split(' ').filter(Boolean);
+    if(!toks.length)return true;
+    const hay=norm(it.deck.title+' '+(it.deck.desc||'')+' '+it.deck.cards.map(c=>plain(c[0]||'')+' '+plain(c[1]||'')).join(' '));
+    return toks.every(t=>hay.indexOf(t)>=0);
+  }
+  function paint(){
+    let items=pubItems().filter(it=>!hidden(it)).filter(match);
+    if(cat==='builtin')items=items.filter(i=>i.builtin);
+    else if(cat==='community')items=items.filter(i=>!i.builtin);
+    else if(cat==='mine')items=items.filter(i=>i.mine);
+    const b=items.filter(i=>i.builtin),c=items.filter(i=>!i.builtin);
+    c.sort(sort==='new'?(x,y)=>y.at-x.at:(x,y)=>(y.score-x.score)||(y.at-x.at));
+    const all=b.concat(c);
+    list.replaceChildren(...all.map(pubTile));
+    const nc=c.length;
+    info.textContent=all.length?(all.length+(all.length===1?' deck':' decks')+(q?' match “'+q.trim()+'”':'')+'.'):
+      (!pubReady?'Loading…':(q?'Nothing matches “'+q.trim()+'”.':(cat==='mine'?'You have not published any decks yet. Open one of your decks and press Publish.':'No decks here yet.')));
+    sortSeg.hidden=cat==='builtin'||nc<2;
+  }
+  setPubHook(paint);
+  paint();
+  return h('div',{class:'wrap view'},
+    btn('Home',{cls:'link',icon:'back',onclick:()=>go('home')}),
+    h('div',{class:'intro',style:'justify-items:start;text-align:left;padding:6px 0 18px'},h('h1',null,'Browse public decks'),
+      h('p',{class:'sub'},'Built-in decks and decks shared by other people. Add any of them to your own decks to study or edit.')),
+    h('div',{class:'toolbar'},search),
+    h('div',{class:'row',style:'margin:12px 0'},catSeg,sortSeg),
+    info,list);
+}
+function pubDeckView(p){
+  const root=h('div',{class:'wrap view'});
+  function paint(){
+    const it=pubFind(p.id);
+    if(!it){
+      if(pubReady){setTimeout(()=>go('browse'),0);return;}
+      root.replaceChildren(btn('Back',{cls:'link',icon:'back',onclick:()=>go('browse')}),h('p',{class:'sub',style:'margin-top:16px'},'Loading…'));
+      return;
+    }
+    const d=it.deck,n=d.cards.length;
+    const canVote=!!(DB&&ME&&CAN)&&!it.builtin&&!it.mine;
+    const mv=myVote(it.gid);
+    const msg=h('p',{class:'hint','aria-live':'polite'});
+    const vote=it.builtin?null:h('div',{class:'votes',role:'group','aria-label':'Rate this deck'},
+      h('button',{type:'button',class:'vbtn','aria-pressed':String(mv===1),disabled:!canVote,title:canVote?'Like':'Sign in with edit access to vote',onclick:()=>castVote(it.gid,1)},icon('up'),h('span',null,String(it.up))),
+      h('button',{type:'button',class:'vbtn','aria-pressed':String(mv===-1),disabled:!canVote,title:canVote?'Dislike':'Sign in with edit access to vote',onclick:()=>castVote(it.gid,-1)},icon('down'),h('span',null,String(it.down))));
+    const rowBtns=h('div',{class:'row'},
+      btn('Add to my decks',{cls:'primary',icon:'plus',onclick:()=>{const nd=addCopy(d);go('deck',{id:nd.id});}}),
+      it.mine?btn('Unpublish',{cls:'ghost',icon:'trash',onclick:()=>{unpublishDeck(it.key);go('browse');}}):null);
+    root.replaceChildren(
+      btn('Browse public decks',{cls:'link',icon:'back',onclick:()=>go('browse')}),
+      h('div',{class:'hub-top'},
+        h('span',{class:'tag'+(it.builtin?' hl':''),style:'justify-self:start'},it.builtin?'Built in':(it.mine?'Yours':'Community')),
+        h('h1',null,d.title),
+        d.desc?h('p',{class:'desc'},d.desc):null,
+        h('div',{class:'chips'},h('span',{class:'tag'},n+' cards'),h('span',{class:'tag'},'Choize '+(d.choize?'on':'off'))),
+        rowBtns,vote,msg,
+        (!it.builtin&&!canVote&&!it.mine)?h('p',{class:'hint'},'Voting needs a signed-in view with edit access.'):null),
+      h('div',{class:'cl cl-open'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
+        d.cards.slice(0,200).map(c=>[h('div',null,rich(c[0])),h('div',null,rich(c[1]))])),
+      n>200?h('p',{class:'hint'},'Showing the first 200 of '+n+' cards.'):null);
+  }
+  setPubHook(paint);
+  paint();
+  return root;
+}
+
+/* =====================================================================
+   Views + boot
+   ===================================================================== */
+const VIEWS={home:homeView,deck:deckView,edit:editView,export:exportView,flash:flashView,match:matchView,write:writeView,learn:learnView,test:testView,browse:browseView,pubdeck:pubDeckView};
+document.getElementById('brand').addEventListener('click',()=>go('home'));
+
+(function boot(){
+  const loc=lsLoad();
+  if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],images:loc.images||{},resume:loc.resume||null,seeded:true};localLoaded=true;}
+  else S={decks:[],review:[],images:{},resume:null,seeded:true};
+  pruneReview(true);
+  const sv=loadView();
+  if(sv&&VIEWS[sv.name]&&sv.name!=='home'){
+    if(sv.name==='browse'||sv.name==='pubdeck'||!sv.id||deckById(sv.id))view=Object.assign({},sv,{restore:sv.name==='edit',resume:!sv.review&&!!resumeFor(sv.name,sv.id)});
+    else pending=sv;
+  }
+  render();
+  connectDb();
+})();
+
+})();
+</script>
+
+</body></html>

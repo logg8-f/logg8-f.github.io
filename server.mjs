@@ -27,7 +27,10 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const MAX_BODY = 300 * 1024; // biggest single write we accept (bytes)
 const MAX_DECKS = 15;        // public decks a single publisher may have
 const MIN_CARDS = 4;         // cards a public deck must have
-const RATE_MAX = 40;         // writes allowed per IP in the window below
+const RATE_MAX = 40;         // writes allowed per IP in the window below.
+                             // NB: behind a reverse proxy (Tailscale serve or Caddy) every
+                             // request arrives from 127.0.0.1, so this collapses into one
+                             // global limit rather than per-visitor. Intentional here, not a bug.
 const RATE_WINDOW = 60 * 1000;
 
 /* ---------- storage: one flat map of "path" -> JSON ---------- */

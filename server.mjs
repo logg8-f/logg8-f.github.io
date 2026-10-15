@@ -253,6 +253,14 @@ const server = http.createServer(async (req, res) => {
         const why = ownerCheck(req, docPath, false);
         if (why) return json(res, 403, { error: why });
         delete store[docPath];
+        if (owners[docPath] !== undefined) {
+          // Inside a personal area the namespace entry still guards the space, so the
+          // per-document entry can be dropped to stop owners.json growing forever.
+          // Everywhere else we keep it: dropping it would let a stranger delete a path
+          // and then re-create it as the same person.
+          const ns = nsOf(docPath);
+          if (ns && docPath !== ns) { delete owners[docPath]; saveOwners(); }
+        }
         save(); broadcast();
         return json(res, 200, { ok: true });
       }

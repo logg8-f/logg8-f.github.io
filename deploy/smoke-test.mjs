@@ -112,6 +112,13 @@ const publisher = NS + '-pub', voter = NS + '-voter', deck = 'd1', gid = publish
   r = await req('GET', 'col/pub');
   ok(r.status === 200, 'public browsing stays open (col/pub)');
 
+  // deleting a personal doc must NOT reopen the area (the namespace entry stays)
+  await req('DELETE', 'doc/data/users/' + publisher + '/meta');
+  r = await req('PUT', 'doc/data/users/' + publisher + '/meta', { data: { seeded: true } });
+  ok(r.status === 200, 'owner can re-create a deleted personal doc');
+  r = await req('PUT', 'doc/data/users/' + publisher + '/meta', { data: 1 }, OTHER);
+  ok(r.status === 403, 'the personal area stays closed after a delete (403)');
+
   // --- votes ---
   r = await req('PUT', 'doc/votes/' + voter, { data: { v: { [gid]: 1 } } });
   ok(r.status === 200, 'cast a vote from another user -> {"ok":true}');

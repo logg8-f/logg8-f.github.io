@@ -1,0 +1,25 @@
+[Unit]
+Description=Quizlet 2.0 web server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Change these two lines if you put the folder somewhere else or run as another user.
+WorkingDirectory=/opt/quizlet
+ExecStart=/usr/bin/node /opt/quizlet/server.mjs
+# User=quizlet
+
+Environment=PORT=8787
+Environment=HOST=0.0.0.0
+
+Restart=always
+RestartSec=2
+
+# A little hardening; harmless if you don't understand it.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/quizlet/data
+
+[Install]
+WantedBy=multi-user.target

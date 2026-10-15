@@ -1,0 +1,2 @@
+# The shared database lives here. Don't put it in git.
+data/

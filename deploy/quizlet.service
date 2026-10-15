@@ -16,6 +16,11 @@ Environment=PORT=8787
 # devices on the same home network to connect directly.
 Environment=HOST=127.0.0.1
 
+# Optional AI grading of typed answers. Put GROQ_API_KEY=... (and optionally
+# GROQ_MODEL=...) in this file. The leading "-" means the service still starts
+# normally if the file is absent, so AI grading is simply off until you add it.
+EnvironmentFile=-/etc/quizlet.env
+
 Restart=always
 RestartSec=2
 

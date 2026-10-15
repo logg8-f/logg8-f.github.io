@@ -24,7 +24,7 @@ const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ': ' + msg); 
 async function req(method, path, body, token) {
   const headers = {};
   if (body) headers['content-type'] = 'application/json';
-  if (method !== 'GET') headers['x-write-token'] = token === null ? '' : (token || TOKEN);
+  headers['x-write-token'] = token === null ? '' : (token || TOKEN);
   const r = await fetch(BASE + path, {
     method,
     cache: 'no-store',
@@ -89,6 +89,29 @@ const publisher = NS + '-pub', voter = NS + '-voter', deck = 'd1', gid = publish
     title: 'Smoke Test 2', cards, at: Date.now() } } } });
   ok(r.status === 200, 'the owner CAN still overwrite their own deck');
 
+  // --- the personal area (data/users/<me>/...) is private ---
+  r = await req('PUT', 'doc/data/users/' + publisher + '/meta', { data: { review: {}, seeded: true } });
+  ok(r.status === 200, 'owner can write into their own personal area');
+
+  r = await req('GET', 'col/data/users/' + publisher);
+  ok(r.status === 200 && (Array.isArray(r.data) ? r.data : []).some(x => x.id === 'meta'),
+    'owner can read their personal area (sees meta)');
+
+  r = await req('GET', 'col/data/users/' + publisher, null, OTHER);
+  ok(r.status === 403, 'another visitor CANNOT read the personal area (403)');
+
+  r = await req('GET', 'col/data/users/' + publisher, null, null);
+  ok(r.status === 403, 'a read of the personal area with no token is refused (403)');
+
+  r = await req('GET', 'col/data/users');
+  ok(r.status === 403, 'the list of visitors (col/data/users) is not listable (403)');
+
+  r = await req('PUT', 'doc/data/users/' + publisher + '/x', { data: 1 }, OTHER);
+  ok(r.status === 403, 'another visitor CANNOT write into the personal area (403)');
+
+  r = await req('GET', 'col/pub');
+  ok(r.status === 200, 'public browsing stays open (col/pub)');
+
   // --- votes ---
   r = await req('PUT', 'doc/votes/' + voter, { data: { v: { [gid]: 1 } } });
   ok(r.status === 200, 'cast a vote from another user -> {"ok":true}');
@@ -102,6 +125,7 @@ const publisher = NS + '-pub', voter = NS + '-voter', deck = 'd1', gid = publish
 
   // cleanup (delete everything we created)
   await req('DELETE', 'doc/pub/' + publisher);
+  await req('DELETE', 'doc/data/users/' + publisher + '/meta');
   await req('DELETE', 'doc/votes/' + voter);
   await req('DELETE', 'doc/votes/' + publisher);
   r = await req('GET', 'col/pub');

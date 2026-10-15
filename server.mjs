@@ -65,8 +65,26 @@ function saveOwners() {
   fs.writeFileSync(tmp, JSON.stringify(owners));
   fs.renameSync(tmp, OWNERS_FILE);
 }
+const tokenOf = req => String(req.headers['x-write-token'] || '').trim();
+/* A visitor's personal area is data/users/<them>/... — their own decks and
+   images, not meant to be seen by anyone else. This returns the area key for a
+   path, or null if the path is not inside one. */
+function nsOf(p) {
+  const s = String(p).split('/');
+  return (s.length >= 3 && s[0] === 'data' && s[1] === 'users') ? s.slice(0, 3).join('/') : null;
+}
+/* Writing: whoever writes a path first owns it, and the same token is required
+   to change it. Inside a personal area, ownership is claimed once for the whole
+   area, so nobody can slip documents into someone else's space. */
 function ownerCheck(req, path, claim) {
-  const tok = String(req.headers['x-write-token'] || '').trim();
+  const tok = tokenOf(req);
+  const ns = nsOf(path);
+  if (ns) {
+    const n = owners[ns];
+    if (n === undefined) {
+      if (claim) { if (!tok) return 'write token required'; owners[ns] = tok; saveOwners(); }
+    } else if (tok !== n) return 'not yours to change';
+  }
   const owner = owners[path];
   if (owner === undefined) {
     if (!claim) return null;            // deleting something never written: harmless
@@ -75,6 +93,19 @@ function ownerCheck(req, path, claim) {
   }
   if (tok !== owner) return 'not yours to change';
   return null;
+}
+/* Reading: public collections (pub/*, votes/*) stay open so anyone can browse
+   and tally votes. A personal area needs its owner's token. An area nobody has
+   claimed yet just reads as empty, so a brand-new visitor's first load works;
+   a claimed one is refused to everyone else. 'data' and 'data/users' are never
+   listable, so the set of visitors cannot be enumerated. */
+function privateRead(req, path) {
+  if (!(path === 'data' || path === 'data/users' || path.startsWith('data/users/'))) return 'open';
+  const ns = nsOf(path);
+  if (!ns) return 'hidden';
+  const owner = owners[ns];
+  if (owner === undefined) return 'empty';
+  return tokenOf(req) === owner ? 'open' : 'denied';
 }
 
 /* ---------- live updates: tell every open page "something changed" ---------- */
@@ -176,6 +207,10 @@ const server = http.createServer(async (req, res) => {
     if (kind === 'col' && req.method === 'GET') {
       const prefix = clean(parts.slice(2).join('/'));
       if (!prefix || prefix.includes('..')) return json(res, 400, { error: 'bad prefix' });
+      const g = privateRead(req, prefix);
+      if (g === 'hidden') return json(res, 403, { error: 'not available' });
+      if (g === 'denied') return json(res, 403, { error: 'not yours' });
+      if (g === 'empty') return json(res, 200, []);
       const head = prefix + '/', out = [];
       for (const key of Object.keys(store)) {
         if (!key.startsWith(head)) continue;
@@ -191,9 +226,11 @@ const server = http.createServer(async (req, res) => {
       if (!docPath || docPath.includes('..')) return json(res, 400, { error: 'bad path' });
 
       if (req.method === 'GET') {
-        return store[docPath] === undefined
-          ? json(res, 404, { error: 'not found' })
-          : json(res, 200, store[docPath]);
+        const g = privateRead(req, docPath);
+        if (g === 'hidden') return json(res, 403, { error: 'not available' });
+        if (g === 'denied') return json(res, 403, { error: 'not yours' });
+        if (g === 'empty' || store[docPath] === undefined) return json(res, 404, { error: 'not found' });
+        return json(res, 200, store[docPath]);
       }
       if (req.method === 'PUT' || req.method === 'POST') {
         if (tooMany(ip)) return json(res, 429, { error: 'slow down' });

@@ -4,10 +4,12 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-# Change these two lines if you put the folder somewhere else or run as another user.
+# Change the paths if you put the folder somewhere else.
+# Runs as the unprivileged "quizlet" user; create it first (see HOW-TO-RUN.md).
 WorkingDirectory=/opt/quizlet
 ExecStart=/usr/bin/node /opt/quizlet/server.mjs
-# User=quizlet
+User=quizlet
+Group=quizlet
 
 Environment=PORT=8787
 Environment=HOST=0.0.0.0

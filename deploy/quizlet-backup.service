@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up the Quizlet shared data file
+
+[Service]
+Type=oneshot
+User=quizlet
+Group=quizlet
+ExecStart=/usr/local/bin/quizlet-backup.sh

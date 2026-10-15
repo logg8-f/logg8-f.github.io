@@ -49,8 +49,14 @@ Everything people publish goes into one file: **`data/db.json`**.
 1. Copy this **whole folder** to the other computer, including the `data/`
    folder, e.g. to `/opt/quizlet`.
 2. On that computer, run `node server.mjs` once to check it starts.
-3. To make it start automatically on boot and restart if it crashes, use the
-   systemd service in `deploy/quizlet.service`:
+3. Create an unprivileged user for it (so the server never runs as root):
+
+   ```
+   sudo useradd --system --no-create-home --shell /usr/sbin/nologin quizlet
+   sudo chown -R quizlet:quizlet /opt/quizlet
+   ```
+
+4. Install the service:
 
    ```
    sudo cp deploy/quizlet.service /etc/systemd/system/quizlet.service
@@ -61,8 +67,22 @@ Everything people publish goes into one file: **`data/db.json`**.
    Then check it with `systemctl status quizlet`, and watch the logs with
    `journalctl -u quizlet -f`.
 
-   If you copied the folder somewhere other than `/opt/quizlet`, edit the two
-   paths at the top of `quizlet.service` first.
+   If you copied the folder somewhere other than `/opt/quizlet`, edit the paths
+   at the top of `quizlet.service` first.
+
+5. Turn on the daily backup of `data/db.json` (keeps the last 14 days):
+
+   ```
+   sudo cp deploy/quizlet-backup.sh /usr/local/bin/quizlet-backup.sh
+   sudo chmod +x /usr/local/bin/quizlet-backup.sh
+   sudo cp deploy/quizlet-backup.service deploy/quizlet-backup.timer /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now quizlet-backup.timer
+   ```
+
+   Snapshots land in `/opt/quizlet/backups/`. To test it right away:
+   `sudo systemctl start quizlet-backup.service` and then
+   `ls /opt/quizlet/backups/`.
 
 ## Letting other people use it
 

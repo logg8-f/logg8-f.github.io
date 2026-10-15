@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.HOST || '127.0.0.1'; // only this machine by default; set HOST=0.0.0.0 to also allow the local network
 
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -184,6 +184,7 @@ const server = http.createServer(async (req, res) => {
   const blocked =
     rel.split('/').some(seg => seg.startsWith('.')) ||
     rel === 'server.mjs' ||
+    rel.endsWith('.md') ||
     rel.startsWith('data/') ||
     rel.startsWith('deploy/');
   const file = path.join(ROOT, rel);
@@ -199,6 +200,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log('Quizlet 2.0 server running');
   console.log('  On this computer:   http://localhost:' + PORT + '/');
-  console.log('  On your network:    http://<this-computer-ip>:' + PORT + '/');
+  if (HOST === '0.0.0.0' || HOST === '::') console.log('  On your network:    http://<this-computer-ip>:' + PORT + '/');
+  else console.log('  Other devices:      not directly reachable (set HOST=0.0.0.0 to allow, or use Tailscale)');
   console.log('  Data file:          ' + DB_FILE);
 });

@@ -12,7 +12,9 @@ User=quizlet
 Group=quizlet
 
 Environment=PORT=8787
-Environment=HOST=0.0.0.0
+# Reachable only through Tailscale by default. Set HOST=0.0.0.0 to also allow
+# devices on the same home network to connect directly.
+Environment=HOST=127.0.0.1
 
 Restart=always
 RestartSec=2
@@ -20,7 +22,8 @@ RestartSec=2
 # A little hardening; harmless if you don't understand it.
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
+ProtectHome=true
+ProtectSystem=strict
 ReadWritePaths=/opt/quizlet/data
 
 [Install]

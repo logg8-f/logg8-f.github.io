@@ -84,15 +84,21 @@ Everything people publish goes into one file: **`data/db.json`**.
    `sudo systemctl start quizlet-backup.service` and then
    `ls /opt/quizlet/backups/`.
 
-## Letting other people use it
+## How it is reached
 
-People reach your server at `http://<the-wardrobe-computer-ip>:8787/`.
-Find that computer's IP address (on Linux: `ip addr`), and make sure its
-firewall allows port 8787.
+By default the server listens **only on the machine it runs on** (`127.0.0.1`),
+so nothing else on your wifi and nothing on the internet can see it. You reach it
+from your own devices through Tailscale — see `SETUP-REMOTE.md`.
 
-If you want a normal address like `http://something.local/` (no port number)
-or want it reachable from outside your home, that needs a reverse proxy
-(for example Caddy or nginx) — ask when you're ready and we'll set it up.
+If you ever want plain local-network access instead (for example a tablet on your
+wifi without Tailscale), start it with `HOST=0.0.0.0`, and make sure the
+firewall allows the port:
+
+```
+HOST=0.0.0.0 node server.mjs
+```
+
+Note the trade-off: that also makes it reachable by anything else on that network.
 
 ## What keeps it from being abused
 

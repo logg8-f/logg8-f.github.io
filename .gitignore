@@ -1,2 +1,6 @@
 # The shared database lives here. Don't put it in git.
 data/
+
+# Runtime backups live next to the data on the server. Ignoring them protects
+# them from a stray `git clean -fd` in the deployment checkout.
+backups/

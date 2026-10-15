@@ -38,11 +38,13 @@ PORT=8080 node server.mjs
 
 ## Where the data is kept
 
-Everything people publish goes into one file: **`data/db.json`**.
+Everything people publish goes into **`data/db.json`**, and a small companion
+file **`data/owners.json`** records the secret key each document belongs to (see
+"What keeps it from being abused"). The second file protects the first.
 
-- To back it up, copy that file.
-- To wipe it and start fresh, delete it.
-- It is deliberately **not** uploaded to GitHub (see `.gitignore`).
+- To back them up, copy the whole `data/` folder.
+- To wipe everything and start fresh, delete the `data/` folder.
+- Neither is uploaded to GitHub (see `.gitignore`).
 
 ## Moving it to the computer in your wardrobe
 
@@ -70,7 +72,7 @@ Everything people publish goes into one file: **`data/db.json`**.
    If you copied the folder somewhere other than `/opt/quizlet`, edit the paths
    at the top of `quizlet.service` first.
 
-5. Turn on the daily backup of `data/db.json` (keeps the last 14 days):
+5. Turn on the daily backup of the `data/` folder (keeps the last 14 days):
 
    ```
    sudo cp deploy/quizlet-backup.sh /usr/local/bin/quizlet-backup.sh
@@ -87,8 +89,16 @@ Everything people publish goes into one file: **`data/db.json`**.
 ## How it is reached
 
 By default the server listens **only on the machine it runs on** (`127.0.0.1`),
-so nothing else on your wifi and nothing on the internet can see it. You reach it
-from your own devices through Tailscale — see `SETUP-REMOTE.md`.
+so it is never exposed directly. Something in front of it does the public-facing
+work and passes requests inward:
+
+- **Public:** the web server on the wardrobe computer (Caddy) answers
+  `https://logg8.duckdns.org/` and forwards to this server on `127.0.0.1:8787`.
+  Caddy also handles the padlock certificate and reports each visitor's real
+  address to the app.
+- **Private:** Tailscale can still reach the same server on its own address — see
+  `SETUP-REMOTE.md`. Handy for checking the app without going through the public
+  door.
 
 If you ever want plain local-network access instead (for example a tablet on your
 wifi without Tailscale), start it with `HOST=0.0.0.0`, and make sure the
@@ -108,7 +118,14 @@ by editing the web page:
 - at most **15** public decks per person,
 - at least **4** cards in a public deck,
 - a size cap on each write,
-- a speed limit on how fast one address can write.
+- a speed limit on how fast one address can write,
+- **only the writer may change what they wrote.** Each browser quietly keeps a
+  secret key; the server remembers the key that created a document and refuses to
+  let anyone else overwrite or delete it. Reading stays open, and there is still
+  no login — the key is invisible to the person using the site.
 
 Decks that get more downvotes than upvotes past a threshold are hidden
 automatically, which already works in the app.
+
+Behind a public web server in front (Caddy), the speed limit counts each visitor
+separately, using the address the front server reports.

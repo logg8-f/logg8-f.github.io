@@ -932,6 +932,21 @@ function recordTest(deck,right,total){
    and keep it in the browser, so each visitor has their own corner. */
 const API_BASE='api/';
 const ANON_KEY='quizlet2.anon';
+const TOKEN_KEY='quizlet2.token';
+/* A secret, per-browser key used to prove "this deck is mine to change". It is
+   never shown to anyone else and never stored in the shared data, so a stranger
+   who can read the public decks still cannot overwrite or delete one. */
+function randHex(n){
+  try{const a=new Uint8Array(n);crypto.getRandomValues(a);let s='';for(const b of a)s+=('0'+b.toString(16)).slice(-2);return s;}
+  catch(e){let s='';for(let i=0;i<n*2;i++)s+='0123456789abcdef'[Math.floor(Math.random()*16)];return s;}
+}
+function writeToken(){
+  try{
+    let v=localStorage.getItem(TOKEN_KEY);
+    if(!v){v=randHex(32);localStorage.setItem(TOKEN_KEY,v);}
+    return v;
+  }catch(e){return randHex(32);}
+}
 function anonId(){
   try{
     let v=localStorage.getItem(ANON_KEY);
@@ -951,7 +966,10 @@ function onApiChange(fn){
 }
 function apiDb(){
   const req=async(method,url,body)=>{
-    const r=await fetch(url,{method,cache:'no-store',headers:body?{'content-type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined});
+    const headers={};
+    if(body)headers['content-type']='application/json';
+    if(method!=='GET')headers['x-write-token']=writeToken();
+    const r=await fetch(url,{method,cache:'no-store',headers:Object.keys(headers).length?headers:undefined,body:body?JSON.stringify(body):undefined});
     if(!r.ok)throw new Error('HTTP '+r.status);
     return r;
   };

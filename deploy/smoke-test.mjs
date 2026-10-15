@@ -3,9 +3,10 @@
 //
 // Exercises the SAME requests the browser UI makes (index.html): the API probe,
 // publishing a deck, browsing the public collection, voting and the vote tally,
-// the server-side limits, and a write/delete round-trip. It is read-mostly but
-// writes a few clearly-namespaced test documents and DELETES them again at the
-// end, so it is safe to run against the live server.
+// the server-side limits, the write-token protection, and a write/delete
+// round-trip. It is read-mostly but writes a few clearly-namespaced test
+// documents and DELETES them again at the end, so it is safe to run against the
+// live server.
 //
 // Usage:
 //   node deploy/smoke-test.mjs                       # http://localhost:8787
@@ -15,14 +16,19 @@
 
 const BASE = (process.env.BASE || 'http://localhost:8787').replace(/\/+$/, '') + '/api/';
 const NS = 'smoke-' + Date.now().toString(36); // unique per run, easy to spot
+const TOKEN = 'tok-' + NS;        // the visitor's secret write token
+const OTHER = 'tok-other-' + NS;  // a second visitor, with no rights to ours
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ': ' + msg); if (!cond) fails++; };
 
-async function req(method, path, body) {
+async function req(method, path, body, token) {
+  const headers = {};
+  if (body) headers['content-type'] = 'application/json';
+  if (method !== 'GET') headers['x-write-token'] = token === null ? '' : (token || TOKEN);
   const r = await fetch(BASE + path, {
     method,
     cache: 'no-store',
-    headers: body ? { 'content-type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
   let data = null; try { data = await r.json(); } catch {}
@@ -65,6 +71,25 @@ const publisher = NS + '-pub', voter = NS + '-voter', deck = 'd1', gid = publish
   r = await req('PUT', 'doc/pub/' + NS + '-many', { data: { decks: many } });
   ok(r.status === 400, 'rejects a publisher with >15 decks');
 
+  // --- write-token protection (the thing that makes public publishing safe) ---
+  r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: { title: 'Hijacked', cards } } } }, OTHER);
+  ok(r.status === 403, 'another visitor CANNOT overwrite our deck (403)');
+
+  r = await req('GET', 'col/pub');
+  const still = (Array.isArray(r.data) ? r.data : []).find(x => x.id === publisher);
+  ok(!!still && still.data.decks[deck].title === 'Smoke Test', 'our deck is untouched after the hijack attempt');
+
+  r = await req('DELETE', 'doc/pub/' + publisher, null, OTHER);
+  ok(r.status === 403, 'another visitor CANNOT delete our deck (403)');
+
+  r = await req('PUT', 'doc/pub/' + NS + '-notoken', { data: { decks: { d: { title: 't', cards } } } }, null);
+  ok(r.status === 403, 'a write with no token is refused (403)');
+
+  r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: {
+    title: 'Smoke Test 2', cards, at: Date.now() } } } });
+  ok(r.status === 200, 'the owner CAN still overwrite their own deck');
+
+  // --- votes ---
   r = await req('PUT', 'doc/votes/' + voter, { data: { v: { [gid]: 1 } } });
   ok(r.status === 200, 'cast a vote from another user -> {"ok":true}');
 

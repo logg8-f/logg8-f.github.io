@@ -23,6 +23,7 @@ const HOST = process.env.HOST || '127.0.0.1'; // only this machine by default; s
 
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+const OWNERS_FILE = path.join(DATA_DIR, 'owners.json'); // path -> the token that owns it
 
 const MAX_BODY = 300 * 1024; // biggest single write we accept (bytes)
 const MAX_DECKS = 15;        // public decks a single publisher may have
@@ -46,6 +47,36 @@ function save() {
   fs.renameSync(tmp, DB_FILE); // atomic: the file is never half-written
 }
 
+/* ---------- write tokens: who may change an existing document ----------
+   Anyone may CREATE a document and anyone may READ one. But overwriting or
+   deleting a document requires the same secret token that first wrote it.
+   The token lives in the visitor's own browser (localStorage) and never in the
+   shared data, so nobody can learn anyone else's. This keeps the no-login
+   design while stopping a stranger from wiping or rewriting other people's
+   decks and votes once the server is public. */
+let owners = loadOwners();
+function loadOwners() {
+  try { return JSON.parse(fs.readFileSync(OWNERS_FILE, 'utf8')) || {}; }
+  catch { return {}; }
+}
+function saveOwners() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = OWNERS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(owners));
+  fs.renameSync(tmp, OWNERS_FILE);
+}
+function ownerCheck(req, path, claim) {
+  const tok = String(req.headers['x-write-token'] || '').trim();
+  const owner = owners[path];
+  if (owner === undefined) {
+    if (!claim) return null;            // deleting something never written: harmless
+    if (!tok) return 'write token required';
+    owners[path] = tok; saveOwners(); return null;
+  }
+  if (tok !== owner) return 'not yours to change';
+  return null;
+}
+
 /* ---------- live updates: tell every open page "something changed" ---------- */
 const clients = new Set();
 function broadcast() {
@@ -60,6 +91,18 @@ function tooMany(ip) {
   arr.push(now);
   hits.set(ip, arr);
   return arr.length > RATE_MAX;
+}
+/* Who the request really came from. Behind a reverse proxy (Caddy, Tailscale
+   serve) every connection arrives from 127.0.0.1, which would make the limit
+   above one global bucket. When — and only when — the direct peer is loopback,
+   trust the proxy's X-Forwarded-For first hop; otherwise use the peer. A remote
+   client cannot spoof this because its own peer is never loopback. */
+function clientIp(req) {
+  const peer = req.socket.remoteAddress || '?';
+  const loop = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
+  const fwd = req.headers['x-forwarded-for'];
+  if (loop && fwd) return String(fwd).split(',')[0].trim() || peer;
+  return peer;
 }
 
 /* ---------- small helpers ---------- */
@@ -112,7 +155,7 @@ function checkPub(data) {
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
   const parts = u.pathname.split('/').filter(Boolean);
-  const ip = req.socket.remoteAddress || '?';
+  const ip = clientIp(req);
 
   /* ---- API ---- */
   if (parts[0] === 'api') {
@@ -154,6 +197,8 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PUT' || req.method === 'POST') {
         if (tooMany(ip)) return json(res, 429, { error: 'slow down' });
+        const why = ownerCheck(req, docPath, true);
+        if (why) return json(res, 403, { error: why });
         let body;
         try { body = JSON.parse(await readBody(req)); }
         catch { return json(res, 400, { error: 'bad body' }); }
@@ -168,6 +213,8 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'DELETE') {
         if (tooMany(ip)) return json(res, 429, { error: 'slow down' });
+        const why = ownerCheck(req, docPath, false);
+        if (why) return json(res, 403, { error: why });
         delete store[docPath];
         save(); broadcast();
         return json(res, 200, { ok: true });

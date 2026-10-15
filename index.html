@@ -85,21 +85,10 @@ button:disabled{cursor:not-allowed}
 .sub{color:var(--ink-2)}
 
 /* hero */
-.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:36px;align-items:center}
-.hero-copy{display:grid;gap:18px;justify-items:start}
+.hero{display:grid}
+.hero-copy{display:grid;gap:18px;justify-items:start;max-width:62ch}
 .hero h1{font-size:clamp(2.3rem,6vw,3.9rem);line-height:1.02;font-weight:700;letter-spacing:-.03em}
 .lead{font-size:1.15rem;color:var(--ink-2);max-width:46ch}
-.hero-art svg{display:block;width:100%;max-width:440px;height:auto;margin-inline:auto}
-.art .c3{fill:var(--surface-2);stroke:var(--line);stroke-width:2}
-.art .c2{fill:var(--surface);stroke:var(--line);stroke-width:2}
-.art .c1{fill:var(--surface);stroke:var(--ink);stroke-width:2.5}
-.art .swipe{fill:var(--mark)}
-.art .t1{font:700 46px var(--f-display);fill:var(--ink);letter-spacing:-1px}
-.art .t2{font:500 17px var(--f-body);fill:var(--ink-2)}
-.art .t3{font:500 13px var(--f-mono);fill:var(--ink-2)}
-.art .key{fill:var(--surface);stroke:var(--ink);stroke-width:2}
-.art .kt{font:500 15px var(--f-mono);fill:var(--ink)}
-@media (max-width:760px){.hero{grid-template-columns:1fr;gap:20px}}
 
 /* decks */
 .decks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:14px}
@@ -173,7 +162,7 @@ textarea.in{resize:vertical;min-height:44px}
 .tg{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 0;font-weight:500}
 .soon{font:500 10px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--ink-2);padding:1px 6px;border-radius:999px;margin-left:8px;font-style:normal}
 .slots{display:grid;gap:10px}
-.slot{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1.6fr) auto;grid-template-areas:"n w d a";gap:10px;align-items:center}
+.slot{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1.6fr) auto;grid-template-areas:"n w d a";gap:10px;align-items:start}
 .slot-n{grid-area:n;font:500 13px var(--f-mono);color:var(--ink-2);text-align:center}
 .slot .cw{grid-area:w}.slot .cd{grid-area:d}.slot-a{grid-area:a;display:flex;gap:2px}
 @media (max-width:640px){
@@ -181,7 +170,9 @@ textarea.in{resize:vertical;min-height:44px}
   .slot-a{flex-direction:column}
 }
 .add-card{justify-self:start}
-.bulk{display:grid;gap:10px;padding:16px;border:1.5px dashed var(--line);border-radius:14px}
+.bulk{display:grid;gap:10px;padding:0 16px 16px}
+details.paste{border:1.5px dashed var(--line);border-radius:14px}
+details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .bulk-info{font:500 13px var(--f-mono);color:var(--ink-2)}
 .err{color:var(--bad);font-weight:600;min-height:1.4em}
 .form-actions{display:flex;flex-wrap:wrap;gap:10px}
@@ -321,11 +312,13 @@ textarea.in{resize:vertical;min-height:44px}
 .hint-mask{font:500 1.3rem/1.5 var(--f-mono);letter-spacing:.2em;white-space:pre-wrap;overflow-wrap:anywhere;min-height:0}
 .hint-mask:empty{display:none}
 /* editor */
-.cell{display:grid;gap:6px;min-width:0}
+.cell{display:grid;gap:5px;min-width:0}
+.cell-lbl{font:500 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 .slot .cw{grid-area:w}.slot .cd{grid-area:d}
-.cell-t{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cell-t{display:none;align-items:center;gap:6px;flex-wrap:wrap}
+.cell:focus-within .cell-t{display:flex}
 .icon-btn.sm{width:30px;height:30px}
-.thumb{display:inline-flex;align-items:center;gap:2px;padding:3px 3px 3px 3px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.thumb{display:inline-flex;align-items:center;gap:2px;padding:3px 3px 3px 3px;border:1px solid var(--line);border-radius:8px;background:var(--surface);justify-self:start}
 .thumb img{display:block;height:34px;width:auto;max-width:90px;border-radius:5px;object-fit:cover}
 .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .fmt{min-width:38px;height:34px;padding:0 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);font:600 14px var(--f-mono)}
@@ -356,9 +349,6 @@ select.in{appearance:auto}
 .pv-l{display:block;font:500 10px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin-bottom:2px}
 .pv-blank{background:var(--hl);color:var(--on-hl);border-bottom:2px solid var(--ink);padding:0 3px;border-radius:3px}
 .fmt.blankbtn{background:var(--surface)}
-.keybtn{cursor:pointer;outline:none}
-.keybtn:hover rect,.keybtn:active rect{fill:var(--hl)}
-.keybtn:focus-visible rect{stroke-width:4}
 /* resume, public decks */
 .resume{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin:26px 0 0;padding:16px 18px;border:1.5px solid var(--ink);border-radius:16px;background:var(--surface);box-shadow:var(--shadow)}
 .rs-t{display:grid;gap:2px;min-width:0}
@@ -1126,39 +1116,7 @@ function previewNode(s){
 /* =====================================================================
    Home
    ===================================================================== */
-const ART='<svg class="art" viewBox="0 0 420 300" aria-label="A stack of flashcards. Use the arrow buttons to look through them.">'+
-'<g transform="rotate(-9 210 150)"><rect x="70" y="50" width="280" height="190" rx="18" class="c3"/></g>'+
-'<g transform="rotate(5 210 150)"><rect x="70" y="50" width="280" height="190" rx="18" class="c2"/></g>'+
-'<g transform="rotate(-2 210 150)"><rect x="70" y="50" width="280" height="190" rx="18" class="c1"/>'+
-'<rect class="swipe" x="132" y="128" width="158" height="26" rx="3" transform="rotate(-1.5 210 140)"/>'+
-'<text x="210" y="152" text-anchor="middle" class="t1"></text>'+
-'<text x="210" y="192" text-anchor="middle" class="t2"></text>'+
-'<text x="92" y="82" class="t3"></text></g>'+
-'<g class="keybtn" id="hk-prev" role="button" tabindex="0" aria-label="Previous card"><rect x="118" y="256" width="38" height="32" rx="8" class="key"/><text x="137" y="278" text-anchor="middle" class="kt">←</text></g>'+
-'<g class="keybtn" id="hk-next" role="button" tabindex="0" aria-label="Next card"><rect x="264" y="256" width="38" height="32" rx="8" class="key"/><text x="283" y="278" text-anchor="middle" class="kt">→</text></g>'+
-'</svg>';
-function heroArt(){
-  const wrap=h('div',{class:'hero-art',html:ART});
-  const words=BUILTIN[0][6].slice(0,8).map(p=>[p[0],plain(p[1])]);
-  let i=0;
-  const t1=wrap.querySelector('.t1'),t2=wrap.querySelector('.t2'),t3=wrap.querySelector('.t3'),sw=wrap.querySelector('.swipe');
-  function paint(){
-    const p=words[i],len=p[0].length;
-    t1.textContent=p[0];t1.style.fontSize=(len>9?34:46)+'px';
-    t2.textContent=p[1];t2.style.fontSize=(p[1].length>28?14:17)+'px';
-    t3.textContent=(i+1)+' / '+words.length;
-    const w=Math.max(60,Math.min(220,len*(len>9?19:26)));
-    sw.setAttribute('width',String(w));sw.setAttribute('x',String(210-w/2));
-  }
-  function step(d){i=(i+d+words.length)%words.length;paint();}
-  [['#hk-prev',-1],['#hk-next',1]].forEach(a=>{
-    const el=wrap.querySelector(a[0]);
-    el.addEventListener('click',()=>step(a[1]));
-    el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();step(a[1]);}});
-  });
-  paint();
-  return wrap;
-}
+
 
 function deckTile(d){
   return h('button',{type:'button',class:'deck',onclick:()=>go('deck',{id:d.id})},
@@ -1176,8 +1134,7 @@ function homeView(){
       h('p',{class:'lead'},'To get started, create a deck of words and definitions. Then study it with flashcards, match, write, learn and test.'),
       h('div',{class:'row'},
         btn('Create a deck',{cls:'primary',icon:'plus',onclick:()=>go('edit')}),
-        btn('Browse public decks',{cls:'ghost',icon:'globe',onclick:()=>go('browse')}))),
-    heroArt());
+        btn('Browse public decks',{cls:'ghost',icon:'globe',onclick:()=>go('browse')}))));
 
   pruneReview(false);
   const items=reviewItems();
@@ -1461,15 +1418,18 @@ function editView(p){
     const file=h('input',{type:'file',accept:'image/*',class:'sr-only',tabindex:'-1','aria-hidden':'true',onchange:e=>{attach(c,imgKey,e.target.files[0]);}});
     const fbtn=(label,tip,l,r,cls)=>h('button',{type:'button',class:'fmt '+(cls||''),title:tip,'aria-label':tip,onclick:()=>wrapSel(inp,l,r)},label);
     const has=c[imgKey]&&S.images[c[imgKey]];
-    return h('div',{class:'cell c'+side},inp,pv,
+    return h('div',{class:'cell c'+side},
+      h('span',{class:'cell-lbl'},side==='w'?'Word':'Definition'),
+      inp,
+      has?h('span',{class:'thumb'},h('img',{src:S.images[c[imgKey]],alt:''}),
+        h('button',{type:'button',class:'icon-btn sm',title:'Remove image','aria-label':'Remove image',onclick:()=>{c[imgKey]=null;persist();renderSlots();}},icon('x'))):null,
+      pv,
       h('div',{class:'cell-t'},
         h('span',{class:'fmt-group'},
           fbtn('B','Make the selected text bold','**','**','b'),
           fbtn('I','Make the selected text italic','*','*','it'),
           (side==='d'&&draft.choize)?fbtn('Blank','Hide the selected word when you practise (Choize)','{','}','blankbtn'):null),
         h('button',{type:'button',class:'fmt imgb',title:'Add an image (you can also paste one)','aria-label':'Add an image to '+(side==='w'?'word ':'definition ')+(i+1),onclick:()=>file.click()},icon('image'),'Image'),
-        has?h('span',{class:'thumb'},h('img',{src:S.images[c[imgKey]],alt:''}),
-          h('button',{type:'button',class:'icon-btn sm',title:'Remove image','aria-label':'Remove image',onclick:()=>{c[imgKey]=null;persist();renderSlots();}},icon('x'))):null,
         file));
   }
   function renderSlots(focusId){
@@ -1553,14 +1513,15 @@ function editView(p){
         h('p',{class:'hint'},'Used by the speaker buttons. Your device needs a voice for the language.')):null,
       h('div',{class:'field'},
         h('div',{class:'sec-h',style:'margin-bottom:0'},h('span',{class:'lbl'},'Cards'),countEl),
-        h('p',{class:'hint'},'Select text in a field to make it bold, italic'+(draft.choize?' or a blank':'')+'. You can also add an image to either side.'),
+        h('p',{class:'hint'},'Click into a box to see its tools: make the selected text bold, italic'+(draft.choize?' or a blank':'')+'. You can also add an image to either side.'),
         slotsBox,
         btn('Add card',{cls:'ghost add-card',icon:'plus',onclick:()=>addAfter(draft.cards.length-1)})),
-      h('div',{class:'bulk'},
-        h('span',{class:'lbl'},'Paste many cards at once'),
-        h('p',{class:'hint'},'One card per line. Choose what sits between the word and the definition:'),
-        seg([[';','; semicolon'],[':',': colon'],['-','- dash'],[',',', comma']],bulkSep,v=>{bulkSep=v;bulk.placeholder=EX[v];updBulk();},'Separator'),
-        bulk,bulkInfo,h('div',null,addBulk)),
+      h('details',{class:'paste'},
+        h('summary',null,'Paste many cards at once'),
+        h('div',{class:'bulk'},
+          h('p',{class:'hint'},'One card per line. Choose what sits between the word and the definition:'),
+          seg([[';','; semicolon'],[':',': colon'],['-','- dash'],[',',', comma']],bulkSep,v=>{bulkSep=v;bulk.placeholder=EX[v];updBulk();},'Separator'),
+          bulk,bulkInfo,h('div',null,addBulk))),
       err,
       h('div',{class:'form-actions'},
         btn(orig?'Save changes':'Create deck',{cls:'primary',icon:'check',onclick:save}),

@@ -54,7 +54,7 @@ const publisher = NS + '-pub', voter = NS + '-voter', deck = 'd1', gid = publish
 
 (async () => {
   let r = await req('GET', 'health');
-  ok(r.status === 200 && r.data && r.data.ok === true, 'GET api/health -> {ok:true}');
+  ok(r.status === 200 && r.data && r.data.ok === true && typeof r.data.ai === 'boolean', 'GET api/health -> ok + ai flag');
 
   r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: {
     title: 'Smoke Test', desc: '', cards, choize: false, langW: '', langD: '', at: Date.now() } } } });

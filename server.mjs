@@ -34,6 +34,16 @@ const RATE_MAX = 40;         // writes allowed per IP in the window below.
                              // global limit rather than per-visitor. Intentional here, not a bug.
 const RATE_WINDOW = 60 * 1000;
 
+/* ---------- optional AI grading ----------
+   Off unless GROQ_API_KEY is set (see HOW-TO-RUN.md). When on, a typed answer
+   that the built-in exact/near match rejects is re-checked by an LLM so a correct
+   paraphrase still counts. If the key is missing or the API is unreachable we just
+   fall back to the built-in matching — studying never depends on it. */
+const GROQ_KEY = String(process.env.GROQ_API_KEY || '').trim();
+const GROQ_MODEL = String(process.env.GROQ_MODEL || 'openai/gpt-oss-120b').trim();
+const AI_RATE_MAX = 20;          // AI gradings allowed per IP in the window below
+const AI_RATE_WINDOW = 60 * 1000;
+
 /* ---------- storage: one flat map of "path" -> JSON ---------- */
 let store = load();
 function load() {
@@ -123,6 +133,14 @@ function tooMany(ip) {
   hits.set(ip, arr);
   return arr.length > RATE_MAX;
 }
+const aiHits = new Map();
+function aiTooMany(ip) {
+  const now = Date.now();
+  const arr = (aiHits.get(ip) || []).filter(t => now - t < AI_RATE_WINDOW);
+  arr.push(now);
+  aiHits.set(ip, arr);
+  return arr.length > AI_RATE_MAX;
+}
 /* Who the request really came from. Behind a reverse proxy (Caddy, Tailscale
    serve) every connection arrives from 127.0.0.1, which would make the limit
    above one global bucket. When — and only when — the direct peer is loopback,
@@ -164,6 +182,43 @@ function readBody(req) {
 }
 const clean = s => String(s || '').replace(/^\/+|\/+$/g, '');
 
+/* Ask the model whether the learner's wording means the same as the expected
+   answer. Returns true/false, or null on any failure (so the caller falls back). */
+const AI_SYS = 'You are a strict but fair grader for a Swedish vocabulary flashcard app. ' +
+  'Decide if the learner\'s answer is CORRECT: it must mean the same as the accepted ' +
+  'answer, allowing synonyms, paraphrases or a shorter equivalent phrasing, but a ' +
+  'different meaning must be rejected. Reply only as JSON: {"correct": true} or {"correct": false}.';
+async function gradeWithAI(q, a, u, blank) {
+  if (!GROQ_KEY) return null;
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 9000);
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + GROQ_KEY },
+      body: JSON.stringify({
+        model: GROQ_MODEL, temperature: 0, max_tokens: 300, reasoning_effort: 'low',
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: AI_SYS },
+          { role: 'user', content: 'Card prompt: ' + q + '\nAccepted answer: ' + a +
+              '\nLearner wrote: ' + u +
+              (blank ? '\n(The learner filled in a blank; accept synonyms and inflections.)' : '') }
+        ]
+      }),
+      signal: ac.signal
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const msg = (j && j.choices && j.choices[0] && j.choices[0].message) || {};
+    const txt = String(msg.content || '');
+    const m = txt.match(/\{[\s\S]*\}/);
+    const obj = JSON.parse(m ? m[0] : txt);
+    return obj && obj.correct === true;
+  } catch { return null; }
+  finally { clearTimeout(to); }
+}
+
 /* ---------- rules for what may be published ---------- */
 function checkPub(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'bad data';
@@ -192,7 +247,7 @@ const server = http.createServer(async (req, res) => {
   if (parts[0] === 'api') {
     const kind = parts[1];
 
-    if (kind === 'health' && req.method === 'GET') return json(res, 200, { ok: true });
+    if (kind === 'health' && req.method === 'GET') return json(res, 200, { ok: true, ai: !!GROQ_KEY });
 
     if (kind === 'stream' && req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
@@ -201,6 +256,22 @@ const server = http.createServer(async (req, res) => {
       const ping = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
       req.on('close', () => { clearInterval(ping); clients.delete(res); });
       return;
+    }
+
+    // AI re-check of one typed answer: POST /api/grade {q,a,u,t}
+    if (kind === 'grade' && req.method === 'POST') {
+      if (!GROQ_KEY) return json(res, 200, { ok: false, reason: 'off' });
+      if (aiTooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+      let body;
+      try { body = JSON.parse(await readBody(req)); }
+      catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
+      const q = String((body && body.q) || '').slice(0, 200).trim();
+      const a = String((body && body.a) || '').slice(0, 400).trim();
+      const u = String((body && body.u) || '').slice(0, 400).trim();
+      if (!a || !u) return json(res, 200, { ok: false, reason: 'empty' });
+      const verdict = await gradeWithAI(q, a, u, (body && body.t) === 'blank');
+      if (verdict === null) return json(res, 200, { ok: false, reason: 'unavailable' });
+      return json(res, 200, { ok: true, correct: verdict });
     }
 
     // list the immediate children of a collection: /api/col/<prefix...>

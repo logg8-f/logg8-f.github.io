@@ -129,3 +129,41 @@ automatically, which already works in the app.
 
 Behind a public web server in front (Caddy), the speed limit counts each visitor
 separately, using the address the front server reports.
+
+## Optional: AI grading of typed answers
+
+In the **Write** practice mode you normally have to type an answer close to the
+stored one (small spelling slips are already forgiven). If you want the app to also
+accept *paraphrases* — saying the same thing in different words — you can switch on
+optional AI grading. It is **off by default**, costs nothing unless you add a key,
+and if the key is missing or the service is unreachable the app simply falls back to
+the normal matching, so studying never breaks.
+
+To turn it on, give the server a free Groq API key (get one at
+https://console.groq.com):
+
+```
+GROQ_API_KEY=your-key-here node server.mjs
+```
+
+Optional settings:
+
+- `GROQ_MODEL` — which model to use (default `openai/gpt-oss-120b`).
+- AI checks are also speed-limited (about 20 per minute per visitor).
+
+**Never put the key in the code or commit it to the repository** — it belongs only
+in the environment of the running server.
+
+If Quizlet runs as a systemd service (as it does on the wardrobe computer), set the
+key on the service instead of the shell. Create `/etc/quizlet.env` containing:
+
+```
+GROQ_API_KEY=your-key-here
+```
+
+then add `EnvironmentFile=/etc/quizlet.env` to `quizlet.service` and reload:
+
+```
+sudo systemctl daemon-reload && sudo systemctl restart quizlet
+```
+

@@ -924,6 +924,7 @@ function recordTest(deck,right,total){
    there is no logged-in user (the normal case) we make up a random "anon id"
    and keep it in the browser, so each visitor has their own corner. */
 const API_BASE='api/';
+let AI=false;                 // becomes true once the server reports AI grading is on
 const ANON_KEY='quizlet2.anon';
 const TOKEN_KEY='quizlet2.token';
 /* A secret, per-browser key used to prove "this deck is mine to change". It is
@@ -988,7 +989,25 @@ function apiDb(){
   };
 }
 async function probeApi(){
-  try{const r=await fetch(API_BASE+'health',{cache:'no-store'});return r.ok?apiDb():null;}catch(e){return null;}
+  try{
+    const r=await fetch(API_BASE+'health',{cache:'no-store'});
+    if(!r.ok)return null;
+    try{const j=await r.json();AI=!!(j&&j.ai);}catch(e){}
+    return apiDb();
+  }catch(e){return null;}
+}
+/* Ask the server to have an AI judge whether a typed answer means the same as the
+   expected one. Returns true/false, or null when AI grading is unavailable (no key,
+   offline, rate-limited) — the caller then falls back to plain exact/near matching. */
+async function aiGrade(q,a,u,blank){
+  try{
+    const r=await fetch(API_BASE+'grade',{method:'POST',cache:'no-store',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({q,a,u,t:blank?'blank':'text'})});
+    if(!r.ok)return null;
+    const j=await r.json();
+    return j&&j.ok?(j.correct===true):null;
+  }catch(e){return null;}
 }
 
 async function connectDb(){
@@ -1724,7 +1743,7 @@ function writeEngine(box,cards,o){
     const q=o.resume.q.map(id=>map.get(id)).filter(Boolean);
     if(q.length){queue=q;solved=Math.max(0,total-new Set(q.map(c=>c.id)).size);}
   }
-  let tapDown=null;
+  let tapDown=null,busy=false;
   const tapSkip=e=>!!(e.target.closest&&e.target.closest('.keep,.speak,.sbar,.opts,.tg,header'));
   function unTap(){if(tap){document.removeEventListener('click',tap);tap=null;}if(tapDown){document.removeEventListener('mousedown',tapDown);tapDown=null;}}
   const firstTry=new Map(),attempts=new Map();
@@ -1811,15 +1830,28 @@ function writeEngine(box,cards,o){
     cur.nearEl=panel;
     cur.area.append(panel);
   }
-  function check(val,btnEl){
-    if(fb||!cur)return;
+  async function check(val,btnEl){
+    if(fb||!cur||busy)return;
     const answer=cur.answer;
     if(cur.mode==='mc'){finalize(val!=null&&norm(val)===norm(answer),val,false,btnEl);return;}
     const res=judge(val,answer);
     if(res.r==='near'){nearPanel(val,res);return;}
-    finalize(res.r==='exact',val,false);
+    if(res.r==='exact'){finalize(true,val,false);return;}
+    const raw=val!=null?String(val).trim():'';
+    if(raw&&AI){
+      const mine=cur;
+      busy=true;mine.actions.hidden=true;
+      const note=h('p',{class:'ask ai-note'},'Checking your wording…');
+      mine.area.append(note);
+      const ok=await aiGrade(plain(mine.wd?mine.c.w:mine.c.d),answer,raw,mine.mode==='cloze');
+      busy=false;
+      if(dead||fb||cur!==mine)return;
+      note.remove();
+      if(ok===true){finalize(true,val,false,undefined,true);return;}
+    }
+    finalize(false,val,false);
   }
-  function finalize(ok,val,revealed,btnEl){
+  function finalize(ok,val,revealed,btnEl,aiAccepted){
     if(fb||!cur)return;
     const c=cur.c,answer=cur.answer;
     const hinted=ok&&cur.hints>0;
@@ -1839,9 +1871,10 @@ function writeEngine(box,cards,o){
       cur.inp.classList.remove('near');cur.inp.classList.add(ok?'ok':'bad');cur.actions.hidden=true;
     }
     const given=val&&String(val).trim();
-    const head=ok?(hinted?'Correct, with '+cur.hints+(cur.hints===1?' hint':' hints'):'Correct'):(revealed||!given?'Here is the answer':'Not quite');
+    const head=ok?(hinted?'Correct, with '+cur.hints+(cur.hints===1?' hint':' hints'):(aiAccepted?'Correct — accepted':'Correct')):(revealed||!given?'Here is the answer':'Not quite');
     const panel=h('div',{class:'fb '+(ok?'ok':'bad'),role:'status'},
       h('strong',null,head),
+      ok&&aiAccepted?h('p',null,'The AI accepted your wording as equivalent to the answer.'):null,
       !ok&&given&&cur.mode!=='mc'?h('p',null,'You wrote: ',h('span',{class:'ans-bad'},given)):null,
       !ok?h('p',null,'Answer: ',h('span',{class:'ans-good'},answer)):null,
       ok&&cur.mode!=='mc'?h('p',null,h('span',{class:'ans-good'},answer)):null);

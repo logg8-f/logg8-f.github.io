@@ -391,7 +391,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.1';
+const APP_VERSION='2.2';
 
 /* =====================================================================
    Pure helpers
@@ -513,17 +513,24 @@ function maskHint(ans,k){
   let n=0;
   return Array.from(String(ans)).map(ch=>{if(!isLetter(ch))return ch;n++;return n<=k?ch:'_';}).join('');
 }
-function distractors(c,answer,wd,k){
-  const seen=new Set([norm(answer)]),out=[];
+function distractors(c,answer,wd,k,avoid){
+  const seen=new Set([norm(answer)]),pool=[];
   shuffle(c.deck.cards).forEach(x=>{
-    if(x.id===c.id||out.length>=k)return;
+    if(x.id===c.id)return;
     const t=plain(wd?x.d:x.w),n=norm(t);
     if(!n||seen.has(n))return;
-    seen.add(n);out.push(t);
+    seen.add(n);pool.push({t,n});
   });
+  const out=[];
+  // Prefer options that were not already the correct answer to an earlier question
+  // in this session: seeing "trovärdig" again as a distractor after answering it
+  // for an earlier card is confusing. If that leaves too few options we fall back
+  // to the rest, so a long deck near its end can still fill four choices.
+  pool.forEach(p=>{if(out.length<k&&!(avoid&&avoid.has(p.n)))out.push(p.t);});
+  pool.forEach(p=>{if(out.length<k&&out.indexOf(p.t)===-1)out.push(p.t);});
   return out;
 }
-function makeOptions(c,answer,wd,n){return shuffle([answer].concat(distractors(c,answer,wd,n-1))).filter(t=>typeof t==='string'&&t.trim());}
+function makeOptions(c,answer,wd,n,avoid){return shuffle([answer].concat(distractors(c,answer,wd,n-1,avoid))).filter(t=>typeof t==='string'&&t.trim());}
 
 /* =====================================================================
    DOM helpers
@@ -684,7 +691,7 @@ function shrink(file){
    ===================================================================== */
 const KEY='quizlet2.v1',VKEY='quizlet2.view',DKEY='quizlet2.draft';
 const INTERVALS=[1,3,7],DAY=86400000;
-let S={decks:[],review:[],images:{},resume:null,seeded:true};
+let S={decks:[],review:[],images:{},resume:null,seeded:true,linked:false};
 let dirty=false,localLoaded=false,col=null,navs=0,pending=null;
 let DB=null,ME=null,PUB={},VOTES={},pubReady=false,pubHook=null,pubNotice='';
 /* Login: off for now (prototype). Set required to true to make publishing and voting need a signed-in account. */
@@ -793,6 +800,40 @@ const BUILTIN=[
 ['grand','stor'],['petit','liten'],['nouveau','ny'],['vieux','gammal'],['bon','bra'],['mauvais','dålig'],['manger','äta'],['boire','dricka'],['dormir','sova'],['parler','prata']]]
 ];
 
+/* Built-in decks keyed by id, plus helpers for linked ("saved") decks.
+   A saved copy of a built-in deck keeps src:'bi:<id>' and no cards of its own:
+   its cards are re-read from BUILTIN whenever the page loads, so editing a
+   built-in deck updates everyone who saved it. Editing a linked deck detaches
+   it first (see editView's save()). */
+const BUILTIN_BY_ID={};
+BUILTIN.forEach(b=>{BUILTIN_BY_ID[b[0]]={id:b[0],title:b[1],desc:b[2],langW:b[3],langD:b[4],choize:b[5],cards:b[6]};});
+const builtinOf=src=>{const m=/^bi:(.+)$/.exec(String(src||''));return m?BUILTIN_BY_ID[m[1]]||null:null;};
+const deckSnap=d=>JSON.stringify([d.title,d.desc||'',!!d.choize,d.langW||'',d.langD||'',d.cards]);
+function hydrateDeck(d){
+  const b=builtinOf(d&&d.src);if(!b)return false;
+  const before=deckSnap(d);
+  d.title=b.title;d.desc=b.desc;d.choize=!!b.choize;d.langW=b.langW||'';d.langD=b.langD||'';
+  d.cards=b.cards.map((c,i)=>({id:'bi:'+b.id+':'+i,w:c[0],d:c[1]}));
+  return deckSnap(d)!==before;
+}
+function hydrateAll(){
+  const changed=[];
+  S.decks.forEach(d=>{if(hydrateDeck(d))changed.push(d);});
+  changed.forEach(touchDeck);
+  return changed.length;
+}
+/* One-time: decks that were saved as a plain copy of a built-in deck (before
+   links existed) are switched over to a link so they follow later edits too. */
+function linkBuiltinCopies(){
+  let changed=false;
+  S.decks.forEach(d=>{
+    if(d.src||d.noLink)return;
+    const b=BUILTIN.find(x=>x[1]===d.title);
+    if(b){d.src='bi:'+b[0];hydrateDeck(d);changed=true;}
+  });
+  return changed;
+}
+
 function migrate(){
   const changed=[];
   S.decks.slice().forEach(d=>{
@@ -828,7 +869,7 @@ async function dbFlush(id){
   e.busy=false;
   if(e.data!==data){clearTimeout(e.timer);dbFlush(id);}
 }
-const metaDoc=()=>({review:clone(S.review),resume:S.resume?clone(S.resume):null,seeded:true});
+const metaDoc=()=>({review:clone(S.review),resume:S.resume?clone(S.resume):null,seeded:true,linked:!!S.linked});
 function touchDeck(d){dirty=true;lsSave();dbQueue('d_'+d.id,clone(d));}
 function touchMeta(){dirty=true;lsSave();dbQueue('meta',metaDoc());}
 function usedImages(){
@@ -1052,8 +1093,10 @@ async function connectDb(){
           S.review=(remoteMeta&&Array.isArray(remoteMeta.review))?remoteMeta.review:[];
           S.images=remoteImgs;
           S.resume=(remoteMeta&&remoteMeta.resume)||null;
+          if(remoteMeta&&remoteMeta.linked)S.linked=true;
         }else{
           if(!S.resume&&remoteMeta&&remoteMeta.resume)S.resume=remoteMeta.resume;
+          if(remoteMeta&&remoteMeta.linked)S.linked=true;
           const have=new Set(S.decks.map(d=>d.id));
           remoteDecks.forEach(d=>{if(!have.has(d.id))S.decks.push(d);});
           const keys=new Set(S.review.map(r=>r.k));
@@ -1070,6 +1113,8 @@ async function connectDb(){
       }
     }catch(e){col=null;}
   }
+  hydrateAll();
+  if(!S.linked){if(linkBuiltinCopies())hydrateAll();S.linked=true;touchMeta();}
   S.seeded=true;
   migrate().forEach(touchDeck);
   startPublic();
@@ -1296,7 +1341,7 @@ function deckView(p){
       d.example?h('span',{class:'tag',style:'justify-self:start'},'Example'):null,
       h('h1',null,d.title),
       d.desc?h('p',{class:'desc'},d.desc):null,
-      h('div',{class:'chips'},h('span',{class:'tag'},n+(n===1?' card':' cards')),h('span',{class:'tag'},'Choize '+(d.choize?'on':'off'))),
+      h('div',{class:'chips'},h('span',{class:'tag'},n+(n===1?' card':' cards')),h('span',{class:'tag'},'Choize '+(d.choize?'on':'off')),d.src?h('span',{class:'tag hl'},'Linked built-in'):null),
       h('div',{class:'row'},
         btn('Edit deck',{cls:'ghost',icon:'edit',onclick:()=>go('edit',{id:d.id})}),
         btn('Export',{cls:'ghost',icon:'export',onclick:()=>go('export',{id:d.id})}),
@@ -1521,7 +1566,7 @@ function editView(p){
     if(!out.length){err.textContent='Add at least one card with a word and a definition.';return;}
     let target;
     const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,langW:draft.langW,langD:draft.langD,cards:out};
-    if(orig){Object.assign(orig,fields);target=orig;}
+    if(orig){Object.assign(orig,fields);if(orig.src){delete orig.src;orig.noLink=true;}target=orig;}
     else{target=Object.assign({id:draft.id,created:draft.created},fields);S.decks.push(target);}
     touchDeck(target);syncImages(Array.from(newImgs));pruneReview(false);
     go('deck',{id:target.id});
@@ -1531,6 +1576,7 @@ function editView(p){
     h('div',{class:'form'},
       btn(orig?'Back to deck':'All decks',{cls:'link',icon:'back',onclick:leaveEdit}),
       h('h1',null,orig?'Edit deck':'New deck'),
+      orig&&orig.src?h('p',{class:'hint'},'This deck is linked to the built-in deck. Saving your edits makes it your own copy, and it stops following the built-in version.'):null,
       h('div',{class:'field'},h('label',{for:'f-title'},'Title'),title),
       h('div',{class:'field'},h('label',{for:'f-desc'},'Description'),desc),
       h('div',{class:'setting'},
@@ -1751,6 +1797,9 @@ function writeEngine(box,cards,o){
     if(q.length){queue=q;solved=Math.max(0,total-new Set(q.map(c=>c.id)).size);}
   }
   let tapDown=null,busy=false;
+  // Correct answers already shown as options this run, so a later question does
+  // not offer one of them as a distractor (see distractors()).
+  const usedAns=new Set();
   const tapSkip=e=>!!(e.target.closest&&e.target.closest('.keep,.speak,.sbar,.opts,.tg,header'));
   function unTap(){if(tap){document.removeEventListener('click',tap);tap=null;}if(tapDown){document.removeEventListener('mousedown',tapDown);tapDown=null;}}
   const firstTry=new Map(),attempts=new Map();
@@ -1773,7 +1822,8 @@ function writeEngine(box,cards,o){
     }else{
       answer=plain(wd?c.d:c.w);
       mode=o.forceChoice?'mc':'type';
-      if(mode==='mc'){opts=makeOptions(c,answer,wd,4);if(opts.length<2){mode='type';opts=null;}}
+      if(mode==='mc'){opts=makeOptions(c,answer,wd,4,usedAns);if(opts.length<2){mode='type';opts=null;}}
+      usedAns.add(norm(answer));
       promptEl=h('div',{class:'wp-text '+lenClass(plain(pText))},rich(pText));
       segs=[{t:pText,lang:langOf(deck,pSide)}];
     }
@@ -1867,6 +1917,7 @@ function writeEngine(box,cards,o){
     if(!ok){firstTry.set(c.id,false);markWrong(c);}
     else if(hinted)firstTry.set(c.id,false);
     else if(!firstTry.has(c.id))firstTry.set(c.id,true);
+    if(o.onAnswer){try{o.onAnswer(c,ok);}catch(e){}}
     if(cur.mode==='mc'){
       cur.area.querySelectorAll('.choice').forEach(b=>{
         b.classList.add('locked');b.setAttribute('aria-disabled','true');b.tabIndex=-1;
@@ -2016,7 +2067,21 @@ function learnView(p){
   const sizes=sectionSizes(N);
   let pos=0;
   const secs=sizes.map(n=>{const s=deck.cards.slice(pos,pos+n);pos+=n;return s.map(c=>sc(deck,c));});
-  const L={sec:0,steps:0,missed:new Set(),everMissed:new Set(),dir:'wd',doneCards:0,inc:[],cor:[],again:[],t0:Date.now()};
+  const L={sec:0,steps:0,missed:new Set(),everMissed:new Set(),dir:'wd',doneCards:0,q:null,t0:Date.now()};
+  // Resume where we left off — whether we arrived from the home "Continue" card
+  // or simply pressed Learn on the deck. A session that is finished (or cleared)
+  // has no saved state, so this starts from the beginning.
+  const lr=resumeFor('learn',deck.id),rd=lr&&lr.data?lr.data:null;
+  if(rd){
+    if(typeof rd.sec==='number'&&rd.sec>=0&&rd.sec<secs.length){L.sec=rd.sec;L.doneCards=sizes.slice(0,L.sec).reduce((a,b)=>a+b,0);}
+    if(typeof rd.step==='number')L.steps=rd.step;
+    if(rd.dir==='wd'||rd.dir==='dw')L.dir=rd.dir;
+    if(Array.isArray(rd.missed))L.missed=new Set(rd.missed);
+    if(Array.isArray(rd.everMissed))L.everMissed=new Set(rd.everMissed);
+    if(rd.doneCards!=null)L.doneCards=rd.doneCards;
+    if(Array.isArray(rd.q))L.q=rd.q;
+  }
+  const resuming=!!rd;
   const fill=h('i'),pct=h('span',{class:'mono'},'0%');
   const cap=h('p',{class:'lcap'});
   const box=h('div');
@@ -2030,40 +2095,58 @@ function learnView(p){
   }
   const getDir=()=>L.dir;
   const wOpts=r=>Object.assign({getDir,getChoize:c=>c.deck.choize},r);
-
+  /* Save enough to continue exactly where we are, including the current step and
+     the cards still queued, so leaving mid-section does not lose progress. */
+  function saveLearn(){
+    if(L.sec>=secs.length)return;
+    setResume('learn',deck.id,Math.round(L.doneCards/N*100)+'% learned',{
+      sec:L.sec,step:L.steps,dir:L.dir,q:L.q||null,
+      missed:[...L.missed],everMissed:[...L.everMissed],doneCards:L.doneCards
+    });
+  }
   function sLearn(){
     kill();L.steps=0;head();
     cap.textContent='Choose the correct answer';
-    eng=writeEngine(box,secs[L.sec],{once:true,forceChoice:true,getDir,onDone:r=>{
-      r.wrong.forEach(c=>{L.missed.add(c.id);L.everMissed.add(c.id);});
-      L.steps=1;head();
-      L.inc=secs[L.sec].filter(c=>L.missed.has(c.id));
-      pMC2();
-    }});
+    eng=writeEngine(box,secs[L.sec],{once:true,forceChoice:true,getDir,resume:L.q?{q:L.q}:null,
+      onProgress:s=>{L.q=s.q;saveLearn();},
+      onAnswer:(c,ok)=>{if(!ok){L.missed.add(c.id);L.everMissed.add(c.id);}saveLearn();},
+      onDone:r=>{
+        L.q=null;
+        r.wrong.forEach(c=>{L.missed.add(c.id);L.everMissed.add(c.id);});
+        L.steps=1;head();saveLearn();
+        L.inc=secs[L.sec].filter(c=>L.missed.has(c.id));
+        pMC2();
+      }});
     setKeys(eng.onKey);
   }
   function pMC2(){
     kill();head();
-    if(!L.inc.length){L.steps=2;head();return pW();}
+    if(!L.inc.length){L.q=null;L.steps=2;head();saveLearn();return pW();}
     cap.textContent='Choose again until you get the missed ones right';
-    eng=writeEngine(box,L.inc,{forceChoice:true,getDir,onDone:()=>{L.steps=2;head();pW();}});
+    eng=writeEngine(box,L.inc,{forceChoice:true,getDir,resume:L.q?{q:L.q}:null,
+      onProgress:s=>{L.q=s.q;saveLearn();},
+      onDone:()=>{L.q=null;L.steps=2;head();saveLearn();pW();}});
     setKeys(eng.onKey);
   }
   function pW(){
     kill();head();
     cap.textContent='Now write the answers';
-    eng=writeEngine(box,secs[L.sec],wOpts({onDone:r=>{
-      r.wrong.forEach(c=>L.everMissed.add(c.id));
-      L.steps=3;head();secDone();
-    }}));
+    eng=writeEngine(box,secs[L.sec],wOpts({resume:L.q?{q:L.q}:null,
+      onProgress:s=>{L.q=s.q;saveLearn();},
+      onAnswer:(c,ok)=>{if(!ok)L.everMissed.add(c.id);saveLearn();},
+      onDone:r=>{
+        L.q=null;
+        r.wrong.forEach(c=>L.everMissed.add(c.id));
+        L.steps=3;head();secDone();
+      }}));
     setKeys(eng.onKey);
   }
   function secDone(){
     L.doneCards+=secs[L.sec].length;L.steps=3;
     L.sec++;
     if(L.sec>=secs.length){L.sec=secs.length-1;return finish();}
-    L.steps=0;L.missed=new Set();L.again=[];L.inc=[];L.cor=[];
-    setResume('learn',deck.id,Math.round(L.doneCards/N*100)+'% learned',{sec:L.sec});
+    L.steps=0;L.missed=new Set();L.inc=[];L.q=null;
+    saveLearn();
     sLearn();
   }
   function finish(){
@@ -2076,7 +2159,7 @@ function learnView(p){
       h('div',{class:'score'},h('span',{class:'mark'},'100% learned')),
       h('p',{class:'sub'},missedN?missedN+(missedN===1?' card needed':' cards needed')+' a second pass. Total time '+fmt(Date.now()-L.t0)+'.':'No misses at all. Total time '+fmt(Date.now()-L.t0)+'.'),
       h('div',{class:'row'},
-        btn('Learn again',{cls:'primary',onclick:()=>go('learn',{id:deck.id})}),
+        btn('Learn again',{cls:'primary',onclick:()=>{clearResume('learn',deck.id);go('learn',{id:deck.id});}}),
         btn('Back to deck',{cls:'ghost',onclick:()=>go('deck',{id:deck.id})}))));
   }
 
@@ -2084,16 +2167,16 @@ function learnView(p){
     studyBar('Learn · '+deck.title,'Back',()=>go('deck',{id:deck.id})),
     h('div',{class:'lhead'},
       h('div',{class:'row',style:'justify-content:space-between'},
-        h('span',{class:'eyebrow'},'Progress'),
-        seg([['wd','Word → Definition'],['dw','Definition → Word']],L.dir,v=>{L.dir=v;if(eng&&eng.refresh)eng.refresh();},'Direction')),
+        h('div',{class:'row',style:'gap:12px;align-items:baseline'},
+          h('span',{class:'eyebrow'},'Progress'),
+          resuming?btn('Start over',{cls:'link',onclick:()=>{clearResume('learn',deck.id);go('learn',{id:deck.id});}}):null),
+        seg([['wd','Word → Definition'],['dw','Definition → Word']],L.dir,v=>{L.dir=v;saveLearn();if(eng&&eng.refresh)eng.refresh();},'Direction')),
       h('div',{class:'lprog'},h('div',{class:'pbar',role:'progressbar','aria-label':'Deck learned'},fill),pct)),
     cap,box);
-  const lr=p.resume?resumeFor('learn',deck.id):null;
-  if(lr&&lr.data&&lr.data.sec>0&&lr.data.sec<secs.length){
-    L.sec=lr.data.sec;
-    L.doneCards=sizes.slice(0,L.sec).reduce((a,b)=>a+b,0);
-  }
-  sLearn();
+  head();
+  if(L.steps===1){L.inc=secs[L.sec].filter(c=>L.missed.has(c.id));pMC2();}
+  else if(L.steps===2){pW();}
+  else{L.steps=0;sLearn();}
   return root;
 }
 
@@ -2161,22 +2244,25 @@ function testView(p){
   function buildTest(types){
     const nonCz=types.filter(t=>t!=='cz'),czOn=types.indexOf('cz')!==-1;
     let k=0;
+    const used=new Set();
     const qs=dealCards(cfg.count).map((c,idx)=>{
       const card=sc(deck,c);
       if(czOn&&hasBlanks(c.d)&&(!nonCz.length||Math.random()<0.6)){
         const cl=parseCloze(c.d),bi=Math.floor(Math.random()*cl.n);
-        return{card,type:'cz',wd:true,prompt:c.w,cl,bi,answer:blankAnswer(cl,bi),given:null,order:idx};
+        const answer=blankAnswer(cl,bi);used.add(norm(answer));
+        return{card,type:'cz',wd:true,prompt:c.w,cl,bi,answer,given:null,order:idx};
       }
       let t=nonCz.length?nonCz[(k++)%nonCz.length]:'wr';
       const wd=cfg.dir==='mix'?Math.random()<.5:cfg.dir==='wd';
       const prompt=wd?c.w:c.d,answer=plain(wd?c.d:c.w);
       const q={card,type:t,wd,prompt,answer,given:null,order:idx};
-      if(t==='mc'){q.options=makeOptions(card,answer,wd,4);if(q.options.length<2)t=q.type='wr';}
+      if(t==='mc'){q.options=makeOptions(card,answer,wd,4,used);if(q.options.length<2)t=q.type='wr';}
       if(t==='tf'){
-        const wrongOnes=distractors(card,answer,wd,1);
+        const wrongOnes=distractors(card,answer,wd,1,used);
         if(!wrongOnes.length)t=q.type='wr';
         else{q.isTrue=Math.random()<.5;q.shown=q.isTrue?answer:wrongOnes[0];}
       }
+      used.add(norm(answer));
       return q;
     });
     const order={tf:0,mc:1,wr:2,cz:3};
@@ -2384,9 +2470,13 @@ function unpublishDeck(key){
   dbQueue('pub_me',{decks:mine},'pub/'+ME);
   pubChanged();
 }
-function addCopy(deck){
+function addCopy(deck,gid){
   const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),
     cards:deck.cards.map(c=>Array.isArray(c)?{id:uid(),w:c[0],d:c[1]}:{id:uid(),w:c.w,d:c.d})};
+  // Saving a built-in deck keeps a live link to it instead of a frozen copy, so
+  // later edits to the built-in deck show up here too. Community decks are still
+  // copied as before.
+  if(gid&&/^bi:/.test(gid)&&builtinOf(gid)){d.src=gid;hydrateDeck(d);}
   S.decks.push(d);touchDeck(d);
   return d;
 }
@@ -2464,7 +2554,7 @@ function pubDeckView(p){
       h('button',{type:'button',class:'vbtn','aria-pressed':String(mv===1),disabled:!canVote,title:canVote?'Like':'Voting needs the shared database',onclick:()=>castVote(it.gid,1)},icon('up'),h('span',null,String(it.up))),
       h('button',{type:'button',class:'vbtn','aria-pressed':String(mv===-1),disabled:!canVote,title:canVote?'Dislike':'Voting needs the shared database',onclick:()=>castVote(it.gid,-1)},icon('down'),h('span',null,String(it.down))));
     const rowBtns=h('div',{class:'row'},
-      btn('Add to my decks',{cls:'primary',icon:'plus',onclick:()=>{const nd=addCopy(d);go('deck',{id:nd.id});}}),
+      btn('Add to my decks',{cls:'primary',icon:'plus',onclick:()=>{const nd=addCopy(d,it.gid);go('deck',{id:nd.id});}}),
       it.mine?btn('Unpublish',{cls:'ghost',icon:'trash',onclick:()=>{unpublishDeck(it.key);go('browse');}}):null);
     root.replaceChildren(
       btn('Browse public decks',{cls:'link',icon:'back',onclick:()=>go('browse')}),
@@ -2473,7 +2563,9 @@ function pubDeckView(p){
         h('h1',null,d.title),
         d.desc?h('p',{class:'desc'},d.desc):null,
         h('div',{class:'chips'},h('span',{class:'tag'},n+' cards'),h('span',{class:'tag'},'Choize '+(d.choize?'on':'off'))),
-        rowBtns,vote,msg,
+        rowBtns,
+        it.builtin?h('p',{class:'hint'},'Saved as a link to the built-in deck: if it is edited later, your copy follows.'):null,
+        vote,msg,
         (!it.builtin&&!canVote&&!it.mine)?((AUTH.required&&!ME)?loginNote('vote'):h('p',{class:'hint'},'Voting needs the shared server, which this page cannot reach right now.')):null,
         pubNotice?h('p',{class:'hint warnline'},pubNotice):null),
       h('div',{class:'cl cl-open'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
@@ -2493,8 +2585,10 @@ document.getElementById('brand').addEventListener('click',()=>go('home'));
 
 (function boot(){
   const loc=lsLoad();
-  if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],images:loc.images||{},resume:loc.resume||null,seeded:true};localLoaded=true;}
-  else S={decks:[],review:[],images:{},resume:null,seeded:true};
+  if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],images:loc.images||{},resume:loc.resume||null,seeded:true,linked:!!loc.linked};localLoaded=true;}
+  else S={decks:[],review:[],images:{},resume:null,seeded:true,linked:false};
+  hydrateAll();
+  if(!S.linked){if(linkBuiltinCopies())hydrateAll();S.linked=true;}
   pruneReview(true);
   const sv=loadView();
   if(sv&&VIEWS[sv.name]&&sv.name!=='home'){

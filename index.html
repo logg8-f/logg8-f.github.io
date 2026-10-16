@@ -52,6 +52,7 @@ button:disabled{cursor:not-allowed}
 .brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:4px 6px 4px 0;font:700 21px/1 var(--f-display);letter-spacing:-.02em}
 .brand svg{width:32px;height:32px;flex:none}
 .brand b{font:500 13px/1 var(--f-mono);background:var(--hl);color:var(--on-hl);padding:4px 6px;border-radius:5px;transform:rotate(-3deg);letter-spacing:0}
+.ver{margin-left:auto;font:500 11px/1 var(--f-mono);color:var(--ink-2);opacity:.4;letter-spacing:.03em;user-select:none;cursor:default}
 .logo-c1{fill:var(--surface-2);stroke:var(--ink);stroke-width:2}
 .logo-c2{fill:var(--surface);stroke:var(--ink);stroke-width:2}
 .logo-hl{fill:var(--hl)}
@@ -380,11 +381,17 @@ select.in{appearance:auto}
 <button type="button" class="brand" id="brand" aria-label="Quizlet 2.0, go to the home page">
 <svg viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-c1" x="3" y="9" width="20" height="16" rx="3" transform="rotate(-8 13 17)"/><rect class="logo-c2" x="9" y="7" width="20" height="16" rx="3" transform="rotate(4 19 15)"/><rect class="logo-hl" x="13" y="14" width="12" height="4" rx="1" transform="rotate(4 19 16)"/></svg>
 <span>Quizlet</span><b>2.0</b></button>
+<span class="ver" id="ver" title="Quizlet"></span>
 </div></header>
 <main id="app"></main>
 <script>
 (function(){
 'use strict';
+
+/* Bump this on every change we ship — a patch for small fixes, a minor for new
+   features — so it is always possible to tell which version a page is running.
+   It is shown, quietly, at the right end of the header. */
+const APP_VERSION='2.1';
 
 /* =====================================================================
    Pure helpers
@@ -2494,6 +2501,8 @@ document.getElementById('brand').addEventListener('click',()=>go('home'));
     if(sv.name==='browse'||sv.name==='pubdeck'||!sv.id||deckById(sv.id))view=Object.assign({},sv,{restore:sv.name==='edit',resume:!sv.review&&!!resumeFor(sv.name,sv.id)});
     else pending=sv;
   }
+  const verEl=document.getElementById('ver');
+  if(verEl){verEl.textContent='v'+APP_VERSION;verEl.title='Quizlet '+APP_VERSION;}
   render();
   connectDb();
 })();

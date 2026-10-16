@@ -404,7 +404,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.4';
+const APP_VERSION='2.5';
 
 /* =====================================================================
    Pure helpers
@@ -879,13 +879,22 @@ async function dbFlush(id){
   if(e.busy){e.timer=setTimeout(()=>dbFlush(id),250);return;}
   e.busy=true;
   const data=e.data;
+  let err=null;
   try{
     const ref=e.path?DB.doc(e.path):col.doc(id);
     if(data===null)await ref.delete();
     else await ref.set(data);
-  }catch(err){/* local copy stays */if(e.path)pubFail(err);}
+    e.tries=0;
+  }catch(x){err=x;/* local copy stays */if(e.path)pubFail(x);}
   e.busy=false;
-  if(e.data!==data){clearTimeout(e.timer);dbFlush(id);}
+  if(e.data!==data){clearTimeout(e.timer);dbFlush(id);return;}
+  /* A write can fail on something transient — offline, or the short per-IP
+     rate limit during a big first sync. Keep the local copy and try again
+     instead of dropping it, so a device never silently loses a deck. */
+  if(err){
+    e.tries=(e.tries||0)+1;
+    if(e.tries<=6){clearTimeout(e.timer);e.timer=setTimeout(()=>dbFlush(id),Math.min(15000,800*e.tries));}
+  }
 }
 const metaDoc=()=>({review:clone(S.review),resume:S.resume?clone(S.resume):null,seeded:true,linked:!!S.linked});
 function touchDeck(d){dirty=true;lsSave();dbQueue('d_'+d.id,clone(d));}
@@ -1020,6 +1029,12 @@ function anonId(){
    answers. UID is the Google account id that owns this user's public decks/votes. */
 const USER_KEY='quizlet2.user';
 function storedUser(){try{const t=localStorage.getItem(USER_KEY);return t?JSON.parse(t):null;}catch(e){return null;}}
+/* Whether this device has already folded its own decks into an account. The
+   first sign-in on a device merges what is already here up into the account, so
+   nothing is left behind; after that the account is the shared truth. */
+const ACCT_KEY='quizlet2.acct.';
+function acctSynced(uid){try{return localStorage.getItem(ACCT_KEY+uid)==='1';}catch(e){return false;}}
+function markAcctSynced(uid){try{localStorage.setItem(ACCT_KEY+uid,'1');}catch(e){}}
 function setUser(u){
   USER=(u&&u.sub)?u:null;UID=USER?USER.sub:null;
   try{if(USER)localStorage.setItem(USER_KEY,JSON.stringify(USER));else localStorage.removeItem(USER_KEY);}catch(e){}
@@ -1034,9 +1049,10 @@ async function authApi(what,body){
   if(!r.ok)throw new Error('HTTP '+r.status);
   return r.json();
 }
-/* Ask the server who we are (the cookie is the real proof). Falls back to the
-   cached profile when the server can't be reached, so the header keeps its shape. */
-async function restoreAuth(){
+/* Ask the server who we are (the cookie is the real proof of identity). Falls
+   back to the cached profile when the server can't be reached, so the header
+   keeps its shape. Also returns the account id the personal area should use. */
+async function resolveAuth(){
   if(!AUTH.on){setUser(null);return;}
   let j=null;
   try{j=await authApi('me');}catch(e){j=null;}
@@ -1107,6 +1123,53 @@ async function aiGrade(q,a,u,blank){
   }catch(e){return null;}
 }
 
+/* ----- the personal area -----
+   When signed out it is this browser's own decks (keyed by the anonymous id);
+   when signed in it is the account's decks (keyed by the Google id), so the
+   same decks and progress meet on every device. */
+async function readPersonal(c){
+  const snap=await c.get();
+  const decks=[],images={};let meta=null;
+  snap.docs.forEach(s=>{
+    const v=s.data();if(!v)return;
+    if(s.id==='meta')meta=clone(v);
+    else if(s.id.indexOf('d_')===0)decks.push(clone(v));
+    else if(s.id.indexOf('i_')===0&&v.data)images[s.id.slice(2)]=v.data;
+  });
+  return {decks,images,meta};
+}
+function pushPersonal(){
+  S.decks.forEach(d=>dbQueue('d_'+d.id,clone(d)));
+  Object.keys(S.images).forEach(id=>dbQueue('i_'+id,{data:S.images[id]}));
+  dbQueue('meta',metaDoc());
+}
+/* 'merge' keeps everything from both sides and sends the union up — used on the
+   first sign-in on a device (nothing is left behind) and whenever this device
+   has changes of its own. 'trust' takes the server's copy as the shared truth
+   when there is one, so a deck deleted elsewhere does not come back. */
+function applyPersonal(remote,mode){
+  const hasRemote=!!remote&&((remote.decks&&remote.decks.length)||remote.meta);
+  if(mode==='merge'||!hasRemote){
+    if(remote&&remote.meta){
+      if(!S.resume&&remote.meta.resume)S.resume=remote.meta.resume;
+      if(remote.meta.linked)S.linked=true;
+    }
+    if(remote){
+      const have=new Set(S.decks.map(d=>d.id));
+      remote.decks.forEach(d=>{if(!have.has(d.id))S.decks.push(d);});
+      const keys=new Set(S.review.map(r=>r.k));
+      ((remote.meta&&remote.meta.review)||[]).forEach(r=>{if(!keys.has(r.k))S.review.push(r);});
+      Object.keys(remote.images).forEach(id=>{if(!S.images[id])S.images[id]=remote.images[id];});
+    }
+    pushPersonal();
+  }else{
+    S.decks=remote.decks;
+    S.review=(remote.meta&&Array.isArray(remote.meta.review))?remote.meta.review:[];
+    S.images=remote.images;
+    S.resume=(remote.meta&&remote.meta.resume)||null;
+    if(remote.meta&&remote.meta.linked)S.linked=true;
+  }
+}
 async function connectDb(){
   let db=null,me=null,user=null;
   try{
@@ -1125,49 +1188,28 @@ async function connectDb(){
   }
   if(db&&me){
     DB=db;ME=me;
+    /* Who are we? With sign-in on, the session cookie is the proof, so ask the
+       server before choosing the personal area. */
+    await resolveAuth();
+    /* The personal area follows the signed-in account, and this browser when
+       signed out, so the same decks and progress meet on every device. */
+    const key=UID||me;
+    const fresh=!!UID&&!acctSynced(UID);
     try{
-      const c=db.collection('data/users/'+me);
-      const snap=await c.get();
-      const remoteDecks=[],remoteImgs={};let remoteMeta=null;
-      snap.docs.forEach(s=>{
-        const v=s.data();if(!v)return;
-        if(s.id==='meta')remoteMeta=clone(v);
-        else if(s.id.indexOf('d_')===0)remoteDecks.push(clone(v));
-        else if(s.id.indexOf('i_')===0&&v.data)remoteImgs[s.id.slice(2)]=v.data;
-      });
+      const c=db.collection('data/users/'+key);
+      const remote=await readPersonal(c);
       col=c;
-      if(remoteDecks.length||remoteMeta){
-        if(!dirty){
-          S.decks=remoteDecks;
-          S.review=(remoteMeta&&Array.isArray(remoteMeta.review))?remoteMeta.review:[];
-          S.images=remoteImgs;
-          S.resume=(remoteMeta&&remoteMeta.resume)||null;
-          if(remoteMeta&&remoteMeta.linked)S.linked=true;
-        }else{
-          if(!S.resume&&remoteMeta&&remoteMeta.resume)S.resume=remoteMeta.resume;
-          if(remoteMeta&&remoteMeta.linked)S.linked=true;
-          const have=new Set(S.decks.map(d=>d.id));
-          remoteDecks.forEach(d=>{if(!have.has(d.id))S.decks.push(d);});
-          const keys=new Set(S.review.map(r=>r.k));
-          ((remoteMeta&&remoteMeta.review)||[]).forEach(r=>{if(!keys.has(r.k))S.review.push(r);});
-          Object.keys(remoteImgs).forEach(id=>{if(!S.images[id])S.images[id]=remoteImgs[id];});
-          S.decks.forEach(d=>dbQueue('d_'+d.id,clone(d)));
-          Object.keys(S.images).forEach(id=>dbQueue('i_'+id,{data:S.images[id]}));
-          dbQueue('meta',metaDoc());
-        }
-      }else{
-        S.decks.forEach(d=>dbQueue('d_'+d.id,clone(d)));
-        Object.keys(S.images).forEach(id=>dbQueue('i_'+id,{data:S.images[id]}));
-        dbQueue('meta',metaDoc());
-      }
+      applyPersonal(remote,(dirty||fresh)?'merge':'trust');
+      if(UID)markAcctSynced(UID);
     }catch(e){col=null;}
+  }else if(AUTH.on){
+    await resolveAuth();
   }
   hydrateAll();
   if(!S.linked){if(linkBuiltinCopies())hydrateAll();S.linked=true;touchMeta();}
   S.seeded=true;
   migrate().forEach(touchDeck);
   startPublic();
-  restoreAuth();
   pruneReview(true);
   if(!col&&!localLoaded)lsSave();
   if(pending&&navs===0&&(!pending.id||deckById(pending.id))){
@@ -2567,13 +2609,20 @@ async function onCredential(resp){
   if(!resp||!resp.credential)return;
   try{
     const j=await authApi('google',{credential:resp.credential});
-    if(j&&j.ok&&j.user)setUser(j.user);
+    if(j&&j.ok&&j.user){
+      setUser(j.user);
+      /* Reload so connectDb can bring in this account's decks and progress
+         (merging whatever this device already had the first time). */
+      try{location.reload();}catch(e){}
+    }
   }catch(e){}
 }
 async function signOut(){
   try{await authApi('logout',{});}catch(e){}
   try{if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();}catch(e){}
   setUser(null);
+  /* Reload so the personal area goes back to this browser's own decks. */
+  try{location.reload();}catch(e){}
 }
 function renderAccount(){
   const el=document.getElementById('acct');

@@ -140,6 +140,32 @@ try {
   r = await req('PUT', 'doc/data/users/local-1/meta', { data: { seeded: true } }, null, 'tok-someone-else');
   ok(r.status === 403, 'a personal area still refuses a different write token (403)');
 
+  // ---- a signed-in account's own area follows the account, not the browser ----
+  // data/users/<sub> belongs to the signed-in account (session), not to a
+  // per-browser write token, so the same decks meet on every device.
+  r = await req('PUT', 'doc/data/users/user-123/meta', { data: { seeded: true, review: [{ k: 'g~d1', n: 2 }] } }, session);
+  ok(r.status === 200, 'a signed-in user can save into their own account area (no write token)');
+  r = await req('GET', 'doc/data/users/user-123/meta', null, session);
+  ok(r.status === 200 && r.data && r.data.review && r.data.review[0].n === 2, 'the account area reads back to that account');
+  r = await req('GET', 'col/data/users/user-123', null, session);
+  ok(r.status === 200 && Array.isArray(r.data) && r.data.some(d => d.id === 'meta'), 'the account can list its own area');
+
+  // ...but to nobody else: not to an anonymous browser...
+  r = await req('GET', 'doc/data/users/user-123/meta');
+  ok(r.status === 403, 'an account area is not readable without signing in (403)');
+  r = await req('PUT', 'doc/data/users/user-123/meta', { data: { seeded: true } }, null, 'tok-stranger');
+  ok(r.status === 401, 'an account area cannot be claimed with a write token (401)');
+  // ...and not to a different account.
+  const rb = await req('POST', 'auth/google', { credential: await mint({ sub: 'user-456', email: 'b@example.com', name: 'Other' }) });
+  ok(rb.status === 200 && rb.data.user.sub === 'user-456', 'a second account can sign in');
+  const sessionB = rb.cookie;
+  r = await req('PUT', 'doc/data/users/user-123/meta', { data: { seeded: true } }, sessionB);
+  ok(r.status === 403, 'another account CANNOT write your area (403)');
+  r = await req('GET', 'doc/data/users/user-123/meta', null, sessionB);
+  ok(r.status === 403, 'another account CANNOT read your area (403)');
+  r = await req('PUT', 'doc/data/users/user-456/meta', { data: { seeded: true } }, sessionB);
+  ok(r.status === 200, 'the second account can write its own area');
+
   // ---- signing out ends the session ----
   r = await req('POST', 'auth/logout', {}, session);
   ok(r.status === 200, 'signing out succeeds');

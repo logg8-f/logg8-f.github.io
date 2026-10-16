@@ -92,6 +92,7 @@ function nsOf(p) {
    to change it. Inside a personal area, ownership is claimed once for the whole
    area, so nobody can slip documents into someone else's space. */
 function ownerCheck(req, path, claim) {
+  if (accountAreaOf(path)) return 'not yours to change'; // account areas belong to the signed-in account
   const tok = tokenOf(req);
   const ns = nsOf(path);
   if (ns) {
@@ -118,6 +119,12 @@ function privateRead(req, path) {
   if (!(path === 'data' || path === 'data/users' || path.startsWith('data/users/'))) return 'open';
   const ns = nsOf(path);
   if (!ns) return 'hidden';
+  // A personal area that belongs to an account is read-only to that account.
+  const sub = String(path).split('/')[2];
+  if (sub && accounts[sub]) {
+    const u = sessionUser(req);
+    return (u && u.sub === sub) ? 'open' : 'denied';
+  }
   const owner = owners[ns];
   if (owner === undefined) return 'empty';
   return tokenOf(req) === owner ? 'open' : 'denied';
@@ -125,8 +132,10 @@ function privateRead(req, path) {
 
 /* ---------- optional Google sign-in ----------
    Off unless GOOGLE_CLIENT_ID is set. When it is on, publishing a deck and
-   voting require a signed-in Google account; personal areas stay local to the
-   browser and do not need signing in.
+   voting require a signed-in Google account, and the account's own personal area
+   (data/users/<sub>/...) is owned by the account too, so the same decks follow
+   the person from one device to another. Signed out, a personal area stays local
+   to the browser and does not need signing in.
 
    How it works: the page gets a Google ID token (a signed JWT) from the browser
    and POSTs it to /api/auth/google. We check the signature against Google's
@@ -153,6 +162,38 @@ function saveSessions() {
   fs.renameSync(tmp, SESSIONS_FILE);
 }
 const randId = () => crypto.randomBytes(24).toString('base64url');
+
+/* The account ids that have ever signed in. A personal area that belongs to one
+   of these (data/users/<sub>/...) is owned by the signed-in account rather than
+   by a browser token, so the same decks and progress follow the person from one
+   device to the next. */
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+let accounts = loadAccounts();
+function loadAccounts() {
+  try { return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')) || {}; }
+  catch { return {}; }
+}
+function saveAccounts() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = ACCOUNTS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(accounts));
+  fs.renameSync(tmp, ACCOUNTS_FILE);
+}
+/* The account a path belongs to (data/users/<sub>/...), or null. */
+function accountAreaOf(p) {
+  const s = String(p).split('/');
+  return (s.length >= 3 && s[0] === 'data' && s[1] === 'users' && accounts[s[2]]) ? s[2] : null;
+}
+/* Who may write an account's personal area. Signing in isn't configured -> null. */
+function accountGate(req, docPath) {
+  if (!GOOGLE_CLIENT_ID) return null;
+  const sub = accountAreaOf(docPath);
+  if (!sub) return null;
+  const u = sessionUser(req);
+  if (!u) return { code: 401, error: 'sign in required' };
+  if (u.sub !== sub) return { code: 403, error: 'not yours' };
+  return null;
+}
 
 function cookies(req) {
   const out = {};
@@ -406,6 +447,9 @@ const server = http.createServer(async (req, res) => {
         catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
         const info = await verifyGoogleIdToken(body && body.credential);
         if (!info) return json(res, 401, { ok: false, reason: 'invalid token' });
+        // Remember this account so its personal area (data/users/<sub>/...) is
+        // owned by the account and follows the person between devices.
+        if (!accounts[info.sub]) { accounts[info.sub] = Date.now(); saveAccounts(); }
         const sid = randId();
         sessions[sid] = { sub: info.sub, email: info.email, name: info.name, picture: info.picture, iat: Date.now(), exp: Date.now() + SESSION_MS };
         saveSessions();
@@ -479,11 +523,12 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PUT' || req.method === 'POST') {
         if (tooMany(ip)) return json(res, 429, { error: 'slow down' });
-        const gate = publicGate(req, docPath);
+        const gate = publicGate(req, docPath) || accountGate(req, docPath);
         if (gate) return json(res, gate.code, { error: gate.error });
-        // With sign-in on, pub/** and votes/** belong to the signed-in account
-        // (checked just above), so the per-browser write token is not needed there.
-        if (!(GOOGLE_CLIENT_ID && /^(pub|votes)\//.test(docPath))) {
+        // With sign-in on, pub/**, votes/** and an account's own personal area
+        // belong to the signed-in account (checked just above), so the
+        // per-browser write token is not needed there.
+        if (!(GOOGLE_CLIENT_ID && (/^(pub|votes)\//.test(docPath) || accountAreaOf(docPath)))) {
           const why = ownerCheck(req, docPath, true);
           if (why) return json(res, 403, { error: why });
         }
@@ -501,9 +546,9 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'DELETE') {
         if (tooMany(ip)) return json(res, 429, { error: 'slow down' });
-        const gate = publicGate(req, docPath);
+        const gate = publicGate(req, docPath) || accountGate(req, docPath);
         if (gate) return json(res, gate.code, { error: gate.error });
-        if (!(GOOGLE_CLIENT_ID && /^(pub|votes)\//.test(docPath))) {
+        if (!(GOOGLE_CLIENT_ID && (/^(pub|votes)\//.test(docPath) || accountAreaOf(docPath)))) {
           const why = ownerCheck(req, docPath, false);
           if (why) return json(res, 403, { error: why });
         }

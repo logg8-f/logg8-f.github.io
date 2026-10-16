@@ -146,8 +146,14 @@ It is **off by default**. When it is off, nothing changes. When it is on:
   not just the page);
 - a deck or vote is owned by the account's stable Google id, so a stranger can
   never publish or vote as someone else;
-- **browsing and studying stay open**, and your personal saved decks stay private
-  to the browser and still need no account.
+- **browsing and studying stay open**;
+- when you **do** sign in, your own saved decks and your study progress (review
+  history, and a Learn run left half-finished) follow the **account**, so the
+  same decks meet you on every device. The first time you sign in on a device,
+  whatever was already saved there is merged in, so nothing is lost — and once a
+  deck is deleted on one device it is gone on the others too;
+- signed out, your personal decks stay private to the browser and need no
+  account.
 
 What you need: an OAuth **client ID** from Google (a free, one-time setup).
 
@@ -199,6 +205,11 @@ published *before* sign-in was on belonged to a browser, not an account. They st
 visible, but the old anonymous owner can no longer update or remove them — the
 person can simply sign in and publish again. Decks and votes made from then on
 belong to their account.
+
+Your own (personal) decks live under `data/` too: signed out they belong to the
+browser (`data/users/<browser-id>/`), signed in they belong to the account
+(`data/users/<account-id>/`), which is what lets them follow you between
+devices. Copying the `data/` folder is therefore a full backup of the app.
 
 ## Optional: AI grading of typed answers
 

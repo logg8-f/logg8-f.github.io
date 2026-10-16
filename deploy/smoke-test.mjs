@@ -8,6 +8,13 @@
 // documents and DELETES them again at the end, so it is safe to run against the
 // live server.
 //
+// Google sign-in: when the server has GOOGLE_CLIENT_ID set, publishing and
+// voting require a signed-in account, which this script cannot create (it would
+// need a real Google token). In that case it checks the door is actually shut
+// (401 without a session) instead of the successful round-trip; the full
+// signed-in flow is covered by deploy/auth-test.mjs, which runs against a local
+// server with a throwaway signing key.
+//
 // Usage:
 //   node deploy/smoke-test.mjs                       # http://localhost:8787
 //   BASE=https://gaderob.tail2714bf.ts.net:8443 node deploy/smoke-test.mjs
@@ -52,45 +59,58 @@ function tally(voteDocs) {
 
 const cards = [['q1','a1'],['q2','a2'],['q3','a3'],['q4','a4']];
 const publisher = NS + '-pub', voter = NS + '-voter', deck = 'd1', gid = publisher + '~' + deck;
+const pubDeck = { decks: { [deck]: { title: 'Smoke Test', desc: '', cards, choize: false, langW: '', langD: '', at: Date.now() } } };
 
 (async () => {
   let r = await req('GET', 'health');
   ok(r.status === 200 && r.data && r.data.ok === true && typeof r.data.ai === 'boolean', 'GET api/health -> ok + ai flag');
+  const authOn = !!(r.data && r.data.auth);
+  console.log('    (sign-in required for publish/vote: ' + (authOn ? 'yes' : 'no') + ')');
 
-  r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: {
-    title: 'Smoke Test', desc: '', cards, choize: false, langW: '', langD: '', at: Date.now() } } } });
-  ok(r.status === 200 && r.data && r.data.ok === true, 'publish a valid deck -> {"ok":true}');
+  if (authOn) {
+    // --- with Google sign-in on, publishing and voting need an account ---
+    r = await req('PUT', 'doc/pub/' + publisher, { data: pubDeck });
+    ok(r.status === 401, 'publishing without signing in is refused (401)');
+    r = await req('PUT', 'doc/votes/' + voter, { data: { v: { [gid]: 1 } } });
+    ok(r.status === 401, 'voting without signing in is refused (401)');
+    r = await req('DELETE', 'doc/pub/' + publisher, null, OTHER);
+    ok(r.status === 401, 'deleting a public deck without signing in is refused (401)');
+  } else {
+    // --- the classic no-login flow ---
+    r = await req('PUT', 'doc/pub/' + publisher, { data: pubDeck });
+    ok(r.status === 200 && r.data && r.data.ok === true, 'publish a valid deck -> {"ok":true}');
 
-  r = await req('GET', 'col/pub');
-  const listed = (Array.isArray(r.data) ? r.data : []).find(x => x.id === publisher);
-  ok(!!listed && listed.data.decks[deck].cards.length === 4, 'Browse (col/pub) lists it with all 4 cards');
+    r = await req('GET', 'col/pub');
+    const listed = (Array.isArray(r.data) ? r.data : []).find(x => x.id === publisher);
+    ok(!!listed && listed.data.decks[deck].cards.length === 4, 'Browse (col/pub) lists it with all 4 cards');
 
-  r = await req('PUT', 'doc/pub/' + NS + '-bad', { data: { decks: { d: { title: 'x', cards: cards.slice(0, 3) } } } });
-  ok(r.status === 400, 'rejects a deck with <4 cards');
+    r = await req('PUT', 'doc/pub/' + NS + '-bad', { data: { decks: { d: { title: 'x', cards: cards.slice(0, 3) } } } });
+    ok(r.status === 400, 'rejects a deck with <4 cards');
 
-  const many = {}; for (let i = 0; i < 16; i++) many['k' + i] = { title: 't', cards };
-  r = await req('PUT', 'doc/pub/' + NS + '-many', { data: { decks: many } });
-  ok(r.status === 400, 'rejects a publisher with >15 decks');
+    const many = {}; for (let i = 0; i < 16; i++) many['k' + i] = { title: 't', cards };
+    r = await req('PUT', 'doc/pub/' + NS + '-many', { data: { decks: many } });
+    ok(r.status === 400, 'rejects a publisher with >15 decks');
 
-  // --- write-token protection (the thing that makes public publishing safe) ---
-  r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: { title: 'Hijacked', cards } } } }, OTHER);
-  ok(r.status === 403, 'another visitor CANNOT overwrite our deck (403)');
+    // --- write-token protection (the thing that makes public publishing safe) ---
+    r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: { title: 'Hijacked', cards } } } }, OTHER);
+    ok(r.status === 403, 'another visitor CANNOT overwrite our deck (403)');
 
-  r = await req('GET', 'col/pub');
-  const still = (Array.isArray(r.data) ? r.data : []).find(x => x.id === publisher);
-  ok(!!still && still.data.decks[deck].title === 'Smoke Test', 'our deck is untouched after the hijack attempt');
+    r = await req('GET', 'col/pub');
+    const still = (Array.isArray(r.data) ? r.data : []).find(x => x.id === publisher);
+    ok(!!still && still.data.decks[deck].title === 'Smoke Test', 'our deck is untouched after the hijack attempt');
 
-  r = await req('DELETE', 'doc/pub/' + publisher, null, OTHER);
-  ok(r.status === 403, 'another visitor CANNOT delete our deck (403)');
+    r = await req('DELETE', 'doc/pub/' + publisher, null, OTHER);
+    ok(r.status === 403, 'another visitor CANNOT delete our deck (403)');
 
-  r = await req('PUT', 'doc/pub/' + NS + '-notoken', { data: { decks: { d: { title: 't', cards } } } }, null);
-  ok(r.status === 403, 'a write with no token is refused (403)');
+    r = await req('PUT', 'doc/pub/' + NS + '-notoken', { data: { decks: { d: { title: 't', cards } } } }, null);
+    ok(r.status === 403, 'a write with no token is refused (403)');
 
-  r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: {
-    title: 'Smoke Test 2', cards, at: Date.now() } } } });
-  ok(r.status === 200, 'the owner CAN still overwrite their own deck');
+    r = await req('PUT', 'doc/pub/' + publisher, { data: { decks: { [deck]: {
+      title: 'Smoke Test 2', cards, at: Date.now() } } } });
+    ok(r.status === 200, 'the owner CAN still overwrite their own deck');
+  }
 
-  // --- the personal area (data/users/<me>/...) is private ---
+  // --- the personal area (data/users/<me>/...) is private, with or without sign-in ---
   r = await req('PUT', 'doc/data/users/' + publisher + '/meta', { data: { review: {}, seeded: true } });
   ok(r.status === 200, 'owner can write into their own personal area');
 
@@ -121,15 +141,20 @@ const publisher = NS + '-pub', voter = NS + '-voter', deck = 'd1', gid = publish
   ok(r.status === 403, 'the personal area stays closed after a delete (403)');
 
   // --- votes ---
-  r = await req('PUT', 'doc/votes/' + voter, { data: { v: { [gid]: 1 } } });
-  ok(r.status === 200, 'cast a vote from another user -> {"ok":true}');
+  if (authOn) {
+    r = await req('GET', 'col/votes');
+    ok(r.status === 200, 'vote tallies stay readable (col/votes)');
+  } else {
+    r = await req('PUT', 'doc/votes/' + voter, { data: { v: { [gid]: 1 } } });
+    ok(r.status === 200, 'cast a vote from another user -> {"ok":true}');
 
-  r = await req('GET', 'col/votes');
-  ok((tally(Array.isArray(r.data) ? r.data : [])[gid] || {}).up === 1, 'vote tallies to 1 like');
+    r = await req('GET', 'col/votes');
+    ok((tally(Array.isArray(r.data) ? r.data : [])[gid] || {}).up === 1, 'vote tallies to 1 like');
 
-  await req('PUT', 'doc/votes/' + publisher, { data: { v: { [gid]: 1 } } }); // self-vote
-  r = await req('GET', 'col/votes');
-  ok((tally(Array.isArray(r.data) ? r.data : [])[gid] || {}).up === 1, 'self-vote is ignored (still 1)');
+    await req('PUT', 'doc/votes/' + publisher, { data: { v: { [gid]: 1 } } }); // self-vote
+    r = await req('GET', 'col/votes');
+    ok((tally(Array.isArray(r.data) ? r.data : [])[gid] || {}).up === 1, 'self-vote is ignored (still 1)');
+  }
 
   // cleanup (delete everything we created)
   await req('DELETE', 'doc/pub/' + publisher);

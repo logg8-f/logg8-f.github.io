@@ -121,14 +121,84 @@ by editing the web page:
 - a speed limit on how fast one address can write,
 - **only the writer may change what they wrote.** Each browser quietly keeps a
   secret key; the server remembers the key that created a document and refuses to
-  let anyone else overwrite or delete it. Reading stays open, and there is still
-  no login — the key is invisible to the person using the site.
+  let anyone else overwrite or delete it. Reading stays open — the key is
+  invisible to the person using the site. (When Google sign-in is switched on,
+  below, publishing and voting need a signed-in account instead.)
 
 Decks that get more downvotes than upvotes past a threshold are hidden
 automatically, which already works in the app.
 
 Behind a public web server in front (Caddy), the speed limit counts each visitor
 separately, using the address the front server reports.
+
+## Optional: signing in with Google
+
+By default the app has no login at all: anyone can publish and vote, and each
+browser's secret key stops them touching anyone else's deck. If you want a
+stronger guarantee — that only real people with a Google account can publish and
+vote, and that a deck or a vote always belongs to an account rather than to one
+browser — you can switch on Google sign-in.
+
+It is **off by default**. When it is off, nothing changes. When it is on:
+
+- the header shows a **Sign in with Google** button;
+- **publishing and voting need a signed-in account** (the server enforces this,
+  not just the page);
+- a deck or vote is owned by the account's stable Google id, so a stranger can
+  never publish or vote as someone else;
+- **browsing and studying stay open**, and your personal saved decks stay private
+  to the browser and still need no account.
+
+What you need: an OAuth **client ID** from Google (a free, one-time setup).
+
+1. Go to https://console.cloud.google.com/apis/credentials (create a project if
+   you don't have one).
+2. **Create credentials → OAuth client ID → Web application.**
+3. Under **Authorized JavaScript origins**, add every address the page is served
+   from — exactly, with scheme and port and no trailing slash. For this server
+   that is typically:
+
+   ```
+   https://gaderob.tail2714bf.ts.net:8443
+   https://logg8.duckdns.org
+   http://localhost:8787
+   ```
+
+   You do **not** need an "Authorized redirect URI" — Google returns the sign-in
+   directly to the page.
+4. Copy the client ID (it looks like
+   `1234567890-abc123.apps.googleusercontent.com`). It is **public**, so it is
+   fine to keep it in a config file; it is not a secret.
+
+Then tell the server, exactly as with the Groq key. Put it in
+`/etc/quizlet.env`:
+
+```
+GOOGLE_CLIENT_ID=1234567890-abc123.apps.googleusercontent.com
+```
+
+and restart:
+
+```
+sudo systemctl restart quizlet
+```
+
+To try it locally, run the server with it in the environment:
+
+```
+GOOGLE_CLIENT_ID=1234567890-abc123.apps.googleusercontent.com node server.mjs
+```
+
+After restarting, `GET /api/health` reports `"auth": true` and the button appears.
+You can check the enforcement with `node deploy/smoke-test.mjs` against the running
+server (it will confirm publishing and voting are refused without signing in).
+To sign everyone out, delete `data/sessions.json` and restart.
+
+A note if you enable this on a server people have already used: decks they
+published *before* sign-in was on belonged to a browser, not an account. They stay
+visible, but the old anonymous owner can no longer update or remove them — the
+person can simply sign in and publish again. Decks and votes made from then on
+belong to their account.
 
 ## Optional: AI grading of typed answers
 

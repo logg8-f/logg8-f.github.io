@@ -3,11 +3,15 @@
  * Quizlet 2.0 - self-hosted backend
  * ---------------------------------
  * Serves the app (index.html) AND a tiny shared database, so anyone who opens
- * this server's address can publish decks and vote without signing in.
+ * this server's address can publish decks and vote. By default no sign-in is
+ * needed; set GOOGLE_CLIENT_ID to require a Google account for publishing and
+ * voting (see the "Google sign-in" block further down).
  *
  * Run it:        node server.mjs
  * Pick a port:   PORT=8080 node server.mjs
+ * Sign-in on:    GOOGLE_CLIENT_ID=...apps.googleusercontent.com node server.mjs
  * Where data is: data/db.json   (delete it to start over)
+ *                data/sessions.json (signed-in sessions; delete to sign everyone out)
  *
  * To move this to another computer you just copy the whole folder, including
  * the data/ folder, and run `node server.mjs` there.
@@ -15,6 +19,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -116,6 +121,128 @@ function privateRead(req, path) {
   const owner = owners[ns];
   if (owner === undefined) return 'empty';
   return tokenOf(req) === owner ? 'open' : 'denied';
+}
+
+/* ---------- optional Google sign-in ----------
+   Off unless GOOGLE_CLIENT_ID is set. When it is on, publishing a deck and
+   voting require a signed-in Google account; personal areas stay local to the
+   browser and do not need signing in.
+
+   How it works: the page gets a Google ID token (a signed JWT) from the browser
+   and POSTs it to /api/auth/google. We check the signature against Google's
+   public keys, then start a session and hand back an HttpOnly cookie. The
+   account's stable id (Google's "sub") becomes the owner of pub/** and votes/**,
+   so nobody can publish or vote as somebody else. Sessions live in their own
+   file (never in the shared store), so the session ids can never be read back
+   out through the document API. */
+const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+const GOOGLE_JWKS_URL = String(process.env.GOOGLE_JWKS_URL || 'https://www.googleapis.com/oauth2/v3/certs').trim();
+const SESSION_COOKIE = 'qz_session';
+const SESSION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+
+let sessions = loadSessions();
+function loadSessions() {
+  try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8')) || {}; }
+  catch { return {}; }
+}
+function saveSessions() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = SESSIONS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(sessions));
+  fs.renameSync(tmp, SESSIONS_FILE);
+}
+const randId = () => crypto.randomBytes(24).toString('base64url');
+
+function cookies(req) {
+  const out = {};
+  String(req.headers.cookie || '').split(';').forEach(p => {
+    const i = p.indexOf('=');
+    if (i < 0) return;
+    out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
+  });
+  return out;
+}
+function isHttps(req) {
+  return String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https' || !!req.socket.encrypted;
+}
+function sessionUser(req) {
+  if (!GOOGLE_CLIENT_ID) return null;
+  const sid = cookies(req)[SESSION_COOKIE];
+  if (!sid) return null;
+  const s = sessions[sid];
+  if (!s) return null;
+  if (s.exp && s.exp < Date.now()) { delete sessions[sid]; saveSessions(); return null; }
+  return s;
+}
+function sessionCookie(value, maxAgeSec, secure) {
+  return SESSION_COOKIE + '=' + value + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + maxAgeSec + (secure ? '; Secure' : '');
+}
+
+/* Verify a Google ID token: RS256 signature against Google's JWKS, plus the
+   audience / issuer / expiry checks Google documents. Returns the account or
+   null. The JWKS is cached for an hour; an unknown key id forces one refetch. */
+let jwksCache = null, jwksAt = 0;
+async function getJwks(force) {
+  if (!force && jwksCache && Date.now() - jwksAt < 3600000) return jwksCache;
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 8000);
+  try {
+    const r = await fetch(GOOGLE_JWKS_URL, { cache: 'no-store', signal: ac.signal });
+    if (!r.ok) throw new Error('jwks ' + r.status);
+    jwksCache = await r.json(); jwksAt = Date.now();
+    return jwksCache;
+  } finally { clearTimeout(to); }
+}
+async function verifyGoogleIdToken(idToken) {
+  if (!GOOGLE_CLIENT_ID) return null;
+  const parts = String(idToken || '').split('.');
+  if (parts.length !== 3) return null;
+  let header, payload;
+  try {
+    header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+    payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  } catch { return null; }
+  if (!header || header.alg !== 'RS256' || !header.kid || !payload) return null;
+
+  let jwks = await getJwks(false).catch(() => null);
+  let jwk = jwks && (jwks.keys || []).find(k => k.kid === header.kid);
+  if (!jwk) {
+    jwks = await getJwks(true).catch(() => null);
+    jwk = jwks && (jwks.keys || []).find(k => k.kid === header.kid);
+  }
+  if (!jwk) return null;
+
+  let key;
+  try { key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']); }
+  catch { return null; }
+  const sig = Buffer.from(parts[2], 'base64url');
+  const signed = Buffer.from(parts[0] + '.' + parts[1]);
+  let good = false;
+  try { good = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sig, signed); }
+  catch { return null; }
+  if (!good) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  if (!payload.sub) return null;
+  if (payload.exp != null && payload.exp < now - 60) return null;      // expired
+  if (payload.iat != null && payload.iat > now + 300) return null;    // issued in the future
+  if (String(payload.aud) !== GOOGLE_CLIENT_ID) return null;          // for a different app
+  const iss = String(payload.iss || '');
+  if (iss !== 'accounts.google.com' && iss !== 'https://accounts.google.com') return null;
+  return { sub: String(payload.sub), email: String(payload.email || ''), name: String(payload.name || ''), picture: String(payload.picture || '') };
+}
+
+/* Who owns pub/** and votes/**. Signing in isn't configured -> null (auth off). */
+function publicGate(req, docPath) {
+  if (!GOOGLE_CLIENT_ID) return null;
+  const p = docPath.split('/');
+  if ((p[0] === 'pub' || p[0] === 'votes') && p.length >= 2) {
+    const u = sessionUser(req);
+    if (!u) return { code: 401, error: 'sign in to publish or vote' };
+    if (p[1] !== u.sub) return { code: 403, error: 'not yours' };
+  }
+  return null;
 }
 
 /* ---------- live updates: tell every open page "something changed" ---------- */
@@ -254,7 +381,47 @@ const server = http.createServer(async (req, res) => {
   if (parts[0] === 'api') {
     const kind = parts[1];
 
-    if (kind === 'health' && req.method === 'GET') return json(res, 200, { ok: true, ai: !!GROQ_KEY });
+    if (kind === 'health' && req.method === 'GET') {
+      return json(res, 200, { ok: true, ai: !!GROQ_KEY, auth: !!GOOGLE_CLIENT_ID, clientId: GOOGLE_CLIENT_ID || '' });
+    }
+
+    /* ---- sign-in: /api/auth/google, /api/auth/me, /api/auth/logout ---- */
+    if (kind === 'auth') {
+      const what = parts[2];
+
+      if (what === 'me' && req.method === 'GET') {
+        const u = sessionUser(req);
+        return json(res, 200, {
+          auth: !!GOOGLE_CLIENT_ID, clientId: GOOGLE_CLIENT_ID || '',
+          user: u ? { sub: u.sub, email: u.email, name: u.name, picture: u.picture } : null
+        });
+      }
+
+      // Exchange a Google ID token for a session cookie.
+      if (what === 'google' && req.method === 'POST') {
+        if (!GOOGLE_CLIENT_ID) return json(res, 200, { ok: false, reason: 'off' });
+        if (tooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+        let body;
+        try { body = JSON.parse(await readBody(req)); }
+        catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
+        const info = await verifyGoogleIdToken(body && body.credential);
+        if (!info) return json(res, 401, { ok: false, reason: 'invalid token' });
+        const sid = randId();
+        sessions[sid] = { sub: info.sub, email: info.email, name: info.name, picture: info.picture, iat: Date.now(), exp: Date.now() + SESSION_MS };
+        saveSessions();
+        res.setHeader('set-cookie', sessionCookie(sid, Math.floor(SESSION_MS / 1000), isHttps(req)));
+        return json(res, 200, { ok: true, user: { sub: info.sub, email: info.email, name: info.name, picture: info.picture } });
+      }
+
+      if (what === 'logout' && req.method === 'POST') {
+        const sid = cookies(req)[SESSION_COOKIE];
+        if (sid && sessions[sid]) { delete sessions[sid]; saveSessions(); }
+        res.setHeader('set-cookie', sessionCookie('', 0, isHttps(req)));
+        return json(res, 200, { ok: true });
+      }
+
+      return json(res, 404, { error: 'no route' });
+    }
 
     if (kind === 'stream' && req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
@@ -312,8 +479,14 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'PUT' || req.method === 'POST') {
         if (tooMany(ip)) return json(res, 429, { error: 'slow down' });
-        const why = ownerCheck(req, docPath, true);
-        if (why) return json(res, 403, { error: why });
+        const gate = publicGate(req, docPath);
+        if (gate) return json(res, gate.code, { error: gate.error });
+        // With sign-in on, pub/** and votes/** belong to the signed-in account
+        // (checked just above), so the per-browser write token is not needed there.
+        if (!(GOOGLE_CLIENT_ID && /^(pub|votes)\//.test(docPath))) {
+          const why = ownerCheck(req, docPath, true);
+          if (why) return json(res, 403, { error: why });
+        }
         let body;
         try { body = JSON.parse(await readBody(req)); }
         catch { return json(res, 400, { error: 'bad body' }); }
@@ -328,8 +501,12 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'DELETE') {
         if (tooMany(ip)) return json(res, 429, { error: 'slow down' });
-        const why = ownerCheck(req, docPath, false);
-        if (why) return json(res, 403, { error: why });
+        const gate = publicGate(req, docPath);
+        if (gate) return json(res, gate.code, { error: gate.error });
+        if (!(GOOGLE_CLIENT_ID && /^(pub|votes)\//.test(docPath))) {
+          const why = ownerCheck(req, docPath, false);
+          if (why) return json(res, 403, { error: why });
+        }
         delete store[docPath];
         if (owners[docPath] !== undefined) {
           // Inside a personal area the namespace entry still guards the space, so the

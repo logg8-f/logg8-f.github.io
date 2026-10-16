@@ -52,7 +52,10 @@ button:disabled{cursor:not-allowed}
 .brand{display:flex;align-items:center;gap:10px;background:none;border:0;padding:4px 6px 4px 0;font:700 21px/1 var(--f-display);letter-spacing:-.02em}
 .brand svg{width:32px;height:32px;flex:none}
 .brand b{font:500 13px/1 var(--f-mono);background:var(--hl);color:var(--on-hl);padding:4px 6px;border-radius:5px;transform:rotate(-3deg);letter-spacing:0}
-.ver{margin-left:auto;font:500 11px/1 var(--f-mono);color:var(--ink-2);opacity:.4;letter-spacing:.03em;user-select:none;cursor:default}
+.ver{margin-left:12px;font:500 11px/1 var(--f-mono);color:var(--ink-2);opacity:.4;letter-spacing:.03em;user-select:none;cursor:default}
+.acct{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0}
+.acct-name{font:500 12px/1 var(--f-mono);color:var(--ink-2);max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct .gsi,.confirm.login .gsi{display:inline-flex;line-height:0;align-items:center}
 .logo-c1{fill:var(--surface-2);stroke:var(--ink);stroke-width:2}
 .logo-c2{fill:var(--surface);stroke:var(--ink);stroke-width:2}
 .logo-hl{fill:var(--hl)}
@@ -381,6 +384,7 @@ select.in{appearance:auto}
 <button type="button" class="brand" id="brand" aria-label="Quizlet 2.0, go to the home page">
 <svg viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-c1" x="3" y="9" width="20" height="16" rx="3" transform="rotate(-8 13 17)"/><rect class="logo-c2" x="9" y="7" width="20" height="16" rx="3" transform="rotate(4 19 15)"/><rect class="logo-hl" x="13" y="14" width="12" height="4" rx="1" transform="rotate(4 19 16)"/></svg>
 <span>Quizlet</span><b>2.0</b></button>
+<span class="acct" id="acct"></span>
 <span class="ver" id="ver" title="Quizlet"></span>
 </div></header>
 <main id="app"></main>
@@ -391,7 +395,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.2';
+const APP_VERSION='2.3';
 
 /* =====================================================================
    Pure helpers
@@ -694,8 +698,13 @@ const INTERVALS=[1,3,7],DAY=86400000;
 let S={decks:[],review:[],images:{},resume:null,seeded:true,linked:false};
 let dirty=false,localLoaded=false,col=null,navs=0,pending=null;
 let DB=null,ME=null,PUB={},VOTES={},pubReady=false,pubHook=null,pubNotice='';
-/* Login: off for now (prototype). Set required to true to make publishing and voting need a signed-in account. */
-const AUTH={required:false};
+/* Google sign-in. The server decides whether it is on (it holds the OAuth client
+   id); the page asks the server. When it is on, publishing and voting need a
+   signed-in account, and the account's Google id (USER.sub -> UID) owns the
+   user's public decks and votes. Personal decks stay private to this browser and
+   never require signing in. */
+let AUTH={on:false,clientId:''};
+let USER=null,UID=null;
 
 /* Built-in public decks: [id, title, description, langW, langD, choize, cards]. Choize decks use {curly brackets} in the definition. */
 const BUILTIN=[
@@ -996,6 +1005,37 @@ function anonId(){
     return v;
   }catch(e){return 'a'+Math.random().toString(36).slice(2,10);}
 }
+/* ----- signed-in account -----
+   The session itself lives in an HttpOnly cookie the server sets; the profile is
+   cached here only so the header can show who is signed in before the server
+   answers. UID is the Google account id that owns this user's public decks/votes. */
+const USER_KEY='quizlet2.user';
+function storedUser(){try{const t=localStorage.getItem(USER_KEY);return t?JSON.parse(t):null;}catch(e){return null;}}
+function setUser(u){
+  USER=(u&&u.sub)?u:null;UID=USER?USER.sub:null;
+  try{if(USER)localStorage.setItem(USER_KEY,JSON.stringify(USER));else localStorage.removeItem(USER_KEY);}catch(e){}
+  renderAccount();
+  if(pubHook)pubChanged();
+}
+async function authApi(what,body){
+  const r=await fetch(API_BASE+'auth/'+what,{
+    method:body?'POST':'GET',cache:'no-store',credentials:'same-origin',
+    headers:body?{'content-type':'application/json'}:undefined,
+    body:body?JSON.stringify(body):undefined});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return r.json();
+}
+/* Ask the server who we are (the cookie is the real proof). Falls back to the
+   cached profile when the server can't be reached, so the header keeps its shape. */
+async function restoreAuth(){
+  if(!AUTH.on){setUser(null);return;}
+  let j=null;
+  try{j=await authApi('me');}catch(e){j=null;}
+  if(j){if(j.clientId)AUTH.clientId=j.clientId;setUser(j.user||null);}
+  else setUser(storedUser());
+  loadGis();
+  renderAccount();
+}
 let apiStream=null,apiSubs=[];
 function onApiChange(fn){
   if(typeof EventSource==='undefined'){const t=setInterval(fn,15000);return()=>clearInterval(t);}
@@ -1040,7 +1080,7 @@ async function probeApi(){
   try{
     const r=await fetch(API_BASE+'health',{cache:'no-store'});
     if(!r.ok)return null;
-    try{const j=await r.json();AI=!!(j&&j.ai);}catch(e){}
+    try{const j=await r.json();AI=!!(j&&j.ai);AUTH={on:!!(j&&j.auth),clientId:String((j&&j.clientId)||'')};}catch(e){}
     return apiDb();
   }catch(e){return null;}
 }
@@ -1118,6 +1158,7 @@ async function connectDb(){
   S.seeded=true;
   migrate().forEach(touchDeck);
   startPublic();
+  restoreAuth();
   pruneReview(true);
   if(!col&&!localLoaded)lsSave();
   if(pending&&navs===0&&(!pending.id||deckById(pending.id))){
@@ -1311,10 +1352,10 @@ function deckView(p){
     const isPub=can&&!!myPublished()[d.id];
     pubBtn.lastChild.textContent=isPub?'Update public copy':'Publish';
     pubBtn.disabled=!can;
-    pubBtn.title=can?'Share this deck in Browse public decks':'Publishing needs the shared database';
+    pubBtn.title=can?'Share this deck in Browse public decks':(AUTH.on?'Sign in to publish':'Publishing needs the shared database');
     const kids=[];
     if(!can){
-      pubBox.replaceChildren((AUTH.required&&!ME)?loginNote('publish decks'):h('p',{class:'hint'},'Publishing needs the shared server, which this page cannot reach right now.'));
+      pubBox.replaceChildren(DB?loginNote('publish decks'):h('p',{class:'hint'},'Publishing needs the shared server, which this page cannot reach right now.'));
       return;
     }
     if(pubAsk){
@@ -2437,38 +2478,99 @@ function pubItems(){
       const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,
         langW:typeof d.langW==='string'?d.langW:'',langD:typeof d.langD==='string'?d.langD:'',at:+d.at||0};
       const gid=u+'~'+k,v=t[gid]||{up:0,down:0};
-      out.push({gid,builtin:false,mine:u===ME,key:k,deck:clean,up:v.up,down:v.down,score:v.up-v.down,at:d.at||0});
+      out.push({gid,builtin:false,mine:u===UID,key:k,deck:clean,up:v.up,down:v.down,score:v.up-v.down,at:d.at||0});
     });
   });
   return out;
 }
 const pubFind=gid=>pubItems().find(x=>x.gid===gid)||null;
-const myVote=gid=>((VOTES[ME]||{})[gid])||0;
+const myVote=gid=>((UID&&VOTES[UID])||{})[gid]||0;
 function castVote(gid,val){
   if(!canShare())return;
-  const cur=Object.assign({},VOTES[ME]||{});
+  const cur=Object.assign({},(UID&&VOTES[UID])||{});
   if(cur[gid]===val)delete cur[gid];else cur[gid]=val;
-  VOTES[ME]=cur;
-  dbQueue('votes_me',{v:cur},'votes/'+ME);
+  VOTES[UID]=cur;
+  dbQueue('votes_me',{v:cur},'votes/'+UID);
   pubChanged();
 }
-const myPublished=()=>(PUB[ME]||{});
+const myPublished=()=>(UID&&PUB[UID])||{};
 function publishDeck(d){
   const mine=Object.assign({},myPublished());
   if(!mine[d.id]&&Object.keys(mine).length>=MAX_PUBLISHED)return 'You can have at most '+MAX_PUBLISHED+' public decks. Unpublish one first.';
   if(d.cards.length<MIN_CARDS)return 'A public deck needs at least '+MIN_CARDS+' cards.';
   mine[d.id]={title:d.title,desc:d.desc||'',cards:d.cards.map(c=>[c.w,c.d]),choize:!!d.choize,langW:d.langW||'',langD:d.langD||'',at:Date.now()};
   if(JSON.stringify(mine).length>200000)return 'That deck is too large to publish. Try splitting it into smaller decks.';
-  PUB[ME]=mine;
-  dbQueue('pub_me',{decks:mine},'pub/'+ME);
+  PUB[UID]=mine;
+  dbQueue('pub_me',{decks:mine},'pub/'+UID);
   pubChanged();
   return null;
 }
 function unpublishDeck(key){
   const mine=Object.assign({},myPublished());
-  delete mine[key];PUB[ME]=mine;
-  dbQueue('pub_me',{decks:mine},'pub/'+ME);
+  delete mine[key];PUB[UID]=mine;
+  dbQueue('pub_me',{decks:mine},'pub/'+UID);
   pubChanged();
+}
+/* ----- Sign in with Google -----
+   Google Identity Services renders the official button and hands us a signed ID
+   token, which the server verifies (signature + audience) before starting a
+   session. The script is only fetched once the server says sign-in is on. */
+let gsiLoading=false,gsiReady=false,gsiBoxes=[];
+function paintGsi(box){
+  if(!box||!box.isConnected||!gsiReady)return;
+  try{google.accounts.id.renderButton(box,{theme:'outline',size:'medium',text:'signin_with',shape:'pill',logo_alignment:'left'});}catch(e){}
+}
+function gsiMount(box){
+  gsiBoxes.push(box);loadGis();
+  setTimeout(()=>paintGsi(box),0);   // the box is often not in the DOM yet at this point
+}
+function loadGis(){
+  if(gsiReady||gsiLoading||!AUTH.clientId)return;
+  if(window.google&&google.accounts&&google.accounts.id){initGis();return;}
+  gsiLoading=true;
+  const s=document.createElement('script');
+  s.src='https://accounts.google.com/gsi/client';s.async=true;s.defer=true;
+  s.onload=()=>{gsiLoading=false;initGis();};
+  s.onerror=()=>{gsiLoading=false;};
+  document.head.appendChild(s);
+}
+function initGis(){
+  if(gsiReady||!(window.google&&google.accounts&&google.accounts.id))return;
+  try{
+    google.accounts.id.initialize({client_id:AUTH.clientId,callback:onCredential,auto_select:false,cancel_on_tap_outside:true});
+    gsiReady=true;
+  }catch(e){return;}
+  gsiBoxes=gsiBoxes.filter(b=>b.isConnected);
+  gsiBoxes.forEach(paintGsi);
+}
+async function onCredential(resp){
+  if(!resp||!resp.credential)return;
+  try{
+    const j=await authApi('google',{credential:resp.credential});
+    if(j&&j.ok&&j.user)setUser(j.user);
+  }catch(e){}
+}
+async function signOut(){
+  try{await authApi('logout',{});}catch(e){}
+  try{if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();}catch(e){}
+  setUser(null);
+}
+function renderAccount(){
+  const el=document.getElementById('acct');
+  if(!el)return;
+  if(USER){
+    el.replaceChildren(
+      h('span',{class:'acct-name',title:(USER.email||'')+' — signed in'},USER.name||USER.email||'Signed in'),
+      btn('Sign out',{cls:'link',onclick:signOut}));
+    return;
+  }
+  if(AUTH.on&&AUTH.clientId){
+    const box=h('span',{class:'gsi'});
+    el.replaceChildren(box);
+    gsiMount(box);
+  }else{
+    el.replaceChildren();
+  }
 }
 function addCopy(deck,gid){
   const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),
@@ -2480,15 +2582,22 @@ function addCopy(deck,gid){
   S.decks.push(d);touchDeck(d);
   return d;
 }
-const loginOk=()=>!AUTH.required||!!ME;
-const canShare=()=>!!(DB&&ME)&&loginOk();
+const loginOk=()=>!(AUTH.on&&!UID);
+const canShare=()=>!!DB&&loginOk();
 function pubFail(err){
   pubNotice='Could not save to the shared database'+(err&&err.code?' ('+err.code+')':'')+'. The page owner may need to give you edit access.';
   pubChanged();
 }
 function loginNote(what){
-  return h('div',{class:'confirm login',role:'status'},h('span',null,'Log in to '+what+'.'),
-    btn('Log in',{cls:'primary',onclick:()=>{try{location.reload();}catch(e){}}}));
+  const kids=[h('span',null,'Sign in with Google to '+what+'.')];
+  if(AUTH.on&&AUTH.clientId){
+    const box=h('span',{class:'gsi'});
+    kids.push(box);
+    gsiMount(box);
+  }else{
+    kids.push(h('span',{class:'hint'},'Sign-in is not set up on this server.'));
+  }
+  return h('div',{class:'confirm login',role:'status'},...kids);
 }
 const hidden=it=>!it.builtin&&!it.mine&&it.score<=HIDE_AT;
 
@@ -2566,7 +2675,7 @@ function pubDeckView(p){
         rowBtns,
         it.builtin?h('p',{class:'hint'},'Saved as a link to the built-in deck: if it is edited later, your copy follows.'):null,
         vote,msg,
-        (!it.builtin&&!canVote&&!it.mine)?((AUTH.required&&!ME)?loginNote('vote'):h('p',{class:'hint'},'Voting needs the shared server, which this page cannot reach right now.')):null,
+        (!it.builtin&&!canVote&&!it.mine)?(DB?loginNote('vote'):h('p',{class:'hint'},'Voting needs the shared server, which this page cannot reach right now.')):null,
         pubNotice?h('p',{class:'hint warnline'},pubNotice):null),
       h('div',{class:'cl cl-open'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
         d.cards.slice(0,200).map(c=>[h('div',null,rich(c[0])),h('div',null,rich(c[1]))])),

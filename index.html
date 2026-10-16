@@ -178,8 +178,13 @@ textarea.in{resize:vertical;min-height:44px}
 .slot{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1.6fr) auto;grid-template-areas:"n w d a";gap:10px;align-items:start}
 .slot-n{grid-area:n;font:500 13px var(--f-mono);color:var(--ink-2);text-align:center}
 .slot .cw{grid-area:w}.slot .cd{grid-area:d}.slot-a{grid-area:a;display:flex;gap:2px}
+.slots.has-ex .slot{grid-template-areas:"n w d a" "n e e a"}
+.slot .ce{grid-area:e}
+.ce .cell-lbl{color:var(--ink)}
+.exnote{margin-left:auto;font:500 11px var(--f-mono);color:var(--ink-2)}
 @media (max-width:640px){
   .slot{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"n w a" "n d a";gap:6px 8px;padding-bottom:10px;border-bottom:1px dashed var(--line)}
+  .slots.has-ex .slot{grid-template-areas:"n w a" "n d a" "n e a";padding-bottom:14px}
   .slot-a{flex-direction:column}
 }
 .add-card{justify-self:start}
@@ -314,6 +319,8 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 /* images, markup, blanks */
 .cimg,.fc-img,.t-img,.wp-img,.q-img,.cl-img{display:block;max-width:100%;border-radius:10px;object-fit:contain}
 .fc-body{display:grid;gap:12px;justify-items:center;min-width:0;max-width:100%}
+.exline{margin:10px 0 0;font:500 clamp(.9rem,2.4vw,1.05rem)/1.45 var(--f-body);color:var(--ink-2);overflow-wrap:anywhere}
+.exline .exl{display:inline-block;font:600 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);margin-right:.5em}
 .fc-img{max-height:150px}
 .t-img{max-height:70px;margin-bottom:6px}
 .tt{display:grid;min-width:0}
@@ -405,7 +412,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.6';
+const APP_VERSION='2.7';
 
 /* =====================================================================
    Pure helpers
@@ -438,6 +445,8 @@ function rich(s){
   if(last<s.length)frag.append(document.createTextNode(s.slice(last)));
   return frag;
 }
+/* A card's example, shown only after the answer (never in the prompt/options). */
+const exLine=e=>h('p',{class:'exline'},h('span',{class:'exl'},'Example'),rich(e));
 function parseCloze(s){
   s=String(s==null?'':s);
   const parts=[],re=/\{([^{}]+)\}/g;
@@ -718,105 +727,25 @@ let USER=null,UID=null;
 
 /* Built-in public decks: [id, title, description, langW, langD, choize, cards]. Choize decks use {curly brackets} in the definition. */
 const BUILTIN=[
-['hp1','HP ord 1','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[
-['vederhäftig','tillförlitlig och sakligt trovärdig'],['förfäkta','hävda eller ivrigt försvara en uppfattning'],['tillvita','beskylla någon för något, ofta en klandervärd handling'],['vidgå','erkänna något, särskilt något man helst vill förneka'],['förmäten','övermodig och oblygt självsäker'],['ådagalägga','visa eller påvisa tydligt'],['vederlägga','motbevisa med argument eller bevis'],['försåtlig','lömsk eller utformad för att vilseleda'],['kallsinnig','känslokall och föga mottaglig för andras lidande'],['beskäftig','överdrivet ivrig att lägga sig i eller visa sin duglighet'],['avog','fientligt eller motvilligt inställd'],['förnumstig','självbelåtet klok och mästrande'],['misshaglig','obehaglig eller motbjudande för någon'],['förhärskande','dominerande eller allmänt rådande'],['hävdvunnen','som grundar sig på gammal sed eller tradition'],['vedersakare','motståndare eller fiende'],['förkovra','förbättra eller utveckla sina kunskaper och färdigheter'],['obstruera','hindra eller motarbeta ett förlopp avsiktligt'],['efemär','kortlivad eller snabbt övergående'],['inexorabel','obeveklig; går inte att hejda eller påverka']]],
-
-['hp2','HP ord 2','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[
-['klandervärd','värd att kritisera eller förebrå'],['gängse','allmänt bruklig eller vedertagen'],['förbehållslös','utan reservationer eller inskränkningar'],['tillkortakommande','brist eller misslyckande i förhållande till förväntningar'],['förebrå','klandra någon för något'],['bestyrka','styrka riktigheten i något med belägg'],['förorda','rekommendera eller uttala sig till förmån för'],['förleda','lura eller locka någon att handla felaktigt'],['försumlig','vårdslös eller bristfällig i utförandet av sina skyldigheter'],['beskaffenhet','egenskap eller det sätt på vilket något är beskaffat'],['tillbörlig','lämplig, passande eller föreskriven enligt normer'],['förtänksam','förutseende och noga med att överväga följder'],['förringa','göra något mindre betydelsefullt än det är'],['översitteri','högfärdigt och nedlåtande beteende mot andra'],['befängd','orimlig eller absurd'],['förnimma','uppfatta eller ana genom sinnena eller intuitionen'],['anstötlig','stötande eller kränkande enligt rådande normer'],['förtret','irritation eller obehag orsakat av något'],['försmädlig','hånfull eller sårande på ett förödmjukande sätt'],['undflyende','svår att fånga, precisera eller få ett tydligt svar från']]],
-
-['hp3','HP ord 3','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[
-['tvetydig','som kan tolkas på minst två olika sätt'],['lakonism','kortfattat uttryckssätt som säger mycket med få ord'],['divergens','avvikelse eller skillnad mellan utvecklingslinjer eller uppfattningar'],['lakun','lucka eller utelämnat parti i en text eller framställning'],['deferent','undfallande och överdrivet respektfull'],['peremptorisk','kategorisk och avvisar invändningar'],['lättsinnig','oansvarig och obekymrad om följderna'],['förtegen','ovillig att lämna ut information'],['burdus','grov, klumpig eller osmidig i sitt uppträdande'],['intrikat','invecklad och svår att reda ut'],['prejudikat','tidigare avgörande som vägleder senare liknande fall'],['vankelmodig','obestämd och oförmögen att fatta beslut'],['konnässör','person med stor sakkunskap och förfinad smak inom ett område'],['impertinent','fräck och respektlös'],['inkongruent','bristande överensstämmelse; inte förenlig'],['proskriptiv','föreskrivande eller förbudsorienterad'],['nedrig','småaktigt elak eller skamlig'],['anfrätta','börja bryta ned eller angripa, exempelvis ett material eller en princip'],['inhärdig','envis och uthållig i sin ståndpunkt'],['prekognition','förmodad förmåga att förutse framtida händelser']]],
-
-['hp4','HP ord 4','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[
-['konnivens','tyst medgivande eller underförstådd tolerans av något otillåtet'],['intransigent','kompromisslös och ovillig att ge efter'],['bristfällig','ofullständig eller otillräcklig'],['futil','fruktlös eller meningslös'],['konsternation','bestörtning och förvirring'],['exorbitant','orimligt hög eller överdriven'],['pietetsfull','präglad av vördnad och varsam respekt'],['sangvinisk','optimistisk och tillitsfull inför framtiden'],['kollationera','jämföra texter eller dokument för att upptäcka skillnader'],['konfundera','förvirra eller bringa i villrådighet'],['ohemul','orimlig, obefogad eller oskälig'],['pervertera','förvränga eller förvanska något från dess ursprungliga form'],['subreption','bedrägligt undanhållande av en viktig omständighet'],['obstinat','envis och motsträvig'],['immanent','inneboende i något eller verkande inom dess gränser'],['insipid','fadd, smaklös eller andefattig'],['exeges','noggrann och systematisk tolkning av en text'],['obeaktad','förbisedd eller inte tagen i beaktande'],['måttlös','utan måtta eller självbehärskning'],['konvenans','det som anses passande enligt sociala normer']]],
-
-['hp5','HP ord 5','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[
-['kasuistisk','inriktad på enskilda fall, ibland överdrivet detaljstyrd'],['indolent','slö, trög eller likgiltig'],['kolloquial','vardaglig och samtalspräglad i språkbruket'],['kontrafaktisk','som utgår från vad som skulle ha hänt om verkligheten varit annorlunda'],['retorsion','svarsåtgärd mot en annan parts åtgärd'],['lakmustest','avgörande prov som avslöjar en egenskap eller ståndpunkt'],['försumma','underlåta att göra något som borde göras'],['genmäle','svar eller invändning mot ett påstående'],['hårdra','tolka eller tillämpa något alltför strikt'],['bevekelsegrund','motiv eller bakomliggande skäl till en handling'],['förskansning','skyddad ställning eller befäst plats'],['misskund','barmhärtighet eller medlidande'],['rättrådig','rättvis och moraliskt hederlig'],['saktmodig','mild, lugn och behärskad'],['tillbakavisande','avvisande eller avfärdande'],['obeveklig','som inte låter sig bevekas eller hejdas'],['utsaga','påstående eller yttrande'],['föregiven','påstådd men inte nödvändigtvis verklig'],['anbelanga','angå eller beröra någon'],['vidlyftig','omfattande och alltför omständlig']]],
-
-['hp-bygg','HP ordbyggnad','Prefix och ändelser (orddelar) som bygger svenska ord — nyckeln till att gissa okända ord i ORD.','sv-SE','sv-SE',false,[
-['a- / an-','Prefix av grekiskt ursprung som ofta betyder utan eller icke. Exempel: asymmetrisk = utan symmetri, anarki = utan härskare eller ordnad överhet.'],['o- / van-','Svenska prefix som ofta betyder inte eller utan. Exempel: ovederhäftig = inte tillförlitlig, vanartig = som inte uppför sig som förväntat.'],['in- / im- / ir- / il-','Latinska prefix som ofta betyder inte. Formen varierar beroende på efterföljande ljud. Exempel: inkompetent = inte kompetent, irrationell = inte rationell, illegal = olaglig, immateriell = inte materiell.'],['dis- / dys-','Dis- kan beteckna åtskillnad eller motsats, medan dys- ofta betyder störd eller bristfällig. Exempel: diskvalificera = utesluta från behörighet, dysfunktionell = som inte fungerar normalt.'],['anti-','Betyder mot eller riktad mot. Exempel: antites = motsats, antidot = motgift, antipatisk = som väcker motvilja.'],['kontra-','Betyder mot, i motsats till eller som svar på. Exempel: kontradiktion = motsägelse, kontraproduktiv = som motverkar sitt eget syfte.'],['pre-','Latinskt prefix som ofta betyder före. Exempel: prejudikat = tidigare rättsavgörande, prehistorisk = som tillhör tiden före historisk tid.'],['pro-','Kan betyda för, framåt eller i stället för, beroende på ordet. Exempel: proaktiv = handlande i förväg, prolog = inledning.'],['post- / retro-','Post- betyder efter, medan retro- betyder bakåt eller tillbaka. Exempel: postum = som ges ut efter döden, retrospektiv = tillbakablickande, retroaktiv = verkande bakåt i tiden.'],['inter- / intra-','Inter- betyder mellan, medan intra- betyder inom. Exempel: internationell = mellan nationer, intramural = inom en institution eller grupp.'],['sub- / super-','Sub- betyder ofta under, medan super- betyder över eller utöver. Exempel: subordination = underordning, superstruktur = överordnad struktur.'],['-lös','Ändelse som betyder utan eller som saknar. Exempel: samvetslös = utan samvete, grundlös = utan grund, fruktlös = utan resultat.'],['-bar','Ändelse som ofta betyder som kan bli föremål för något eller som går att. Exempel: mätbar = som kan mätas, försumbar = så liten att den kan försummas.'],['-abel / -ibel','Ändelser som ofta bildar adjektiv med betydelsen möjlig att eller som kan. Exempel: acceptabel = möjlig att godta, plausibel = rimlig eller trovärdig.'],['-ism','Ändelse som ofta betecknar en lära, ideologi, riktning, metod eller företeelse. Exempel: empirism = kunskapssyn som betonar erfarenhet, pragmatism = inriktning på praktiska följder, anakronism = något som är felplacerat i tiden.'],['-ist','Ändelse som ofta betecknar en person som företräder en lära eller utövar en verksamhet. Exempel: empirist = anhängare av empirism, purist = någon som vill hålla något fritt från främmande inslag, nihilist = person som förnekar givna värden eller mening.'],['-itet','Ändelse som bildar substantiv som betecknar en egenskap, ett tillstånd eller en grad. Exempel: validitet = giltighet, ambiguitet = tvetydighet, rigiditet = stelhet eller oflexibilitet.'],['-fobi / -fil','Fobi betyder rädsla eller stark motvilja, medan fil betyder att man tycker om något eller dras till det. Exempel: xenofobi = främlingsfientlighet, hydrofob = vattenavstötande, bibliofil = bokälskare.'],['bene- / mal-','Bene- betyder väl eller gott, medan mal- betyder dåligt eller illa. Exempel: benefik = välgörande eller förmånlig, malign = elakartad, malformation = missbildning.'],['-logi / -logisk','Orddel med ursprung i grekiskans logos som ofta betecknar en lära, vetenskap eller systematisk undersökning. Exempel: ontologi = läran om varat, epistemologi = läran om kunskap, analogi = likhet mellan förhållanden.'],['-ficera / -fikation','Orddelar som ofta hänger samman med att göra något till, skapa eller åstadkomma ett tillstånd. Exempel: klassificera = dela in i klasser, intensifiera = göra intensivare, verifikation = kontroll eller bekräftelse av riktighet.']]],
-
-['eu-cap','Europas huvudstäder','Vilken stad är huvudstad i vilket land? Blanks gör att du tränar båda hållen.','sv-SE','sv-SE',true,[
-['Paris','{Huvudstaden} i {Frankrike}'],['Berlin','{Huvudstaden} i {Tyskland}'],['Madrid','{Huvudstaden} i {Spanien}'],['Rom','{Huvudstaden} i {Italien}'],
-['Lissabon','{Huvudstaden} i {Portugal}'],['London','{Huvudstaden} i {Storbritannien}'],['Dublin','{Huvudstaden} i {Irland}'],['Bryssel','{Huvudstaden} i {Belgien}'],
-['Amsterdam','{Huvudstaden} i {Nederländerna}'],['Bern','{Huvudstaden} i {Schweiz}'],['Wien','{Huvudstaden} i {Österrike}'],['Prag','{Huvudstaden} i {Tjeckien}'],
-['Warszawa','{Huvudstaden} i {Polen}'],['Budapest','{Huvudstaden} i {Ungern}'],['Köpenhamn','{Huvudstaden} i {Danmark}'],['Oslo','{Huvudstaden} i {Norge}'],
-['Helsingfors','{Huvudstaden} i {Finland}'],['Stockholm','{Huvudstaden} i {Sverige}'],['Aten','{Huvudstaden} i {Grekland}'],['Reykjavik','{Huvudstaden} i {Island}'],
-['Vilnius','{Huvudstaden} i {Litauen}'],['Riga','{Huvudstaden} i {Lettland}'],['Tallinn','{Huvudstaden} i {Estland}'],['Bukarest','{Huvudstaden} i {Rumänien}'],
-['Sofia','{Huvudstaden} i {Bulgarien}'],['Belgrad','{Huvudstaden} i {Serbien}'],['Zagreb','{Huvudstaden} i {Kroatien}']]],
-
-['world-cap','Världens huvudstäder','Huvudstäder utanför Europa.','sv-SE','sv-SE',true,[
-['Tokyo','{Huvudstaden} i {Japan}'],['Peking','{Huvudstaden} i {Kina}'],['Seoul','{Huvudstaden} i {Sydkorea}'],['New Delhi','{Huvudstaden} i {Indien}'],
-['Bangkok','{Huvudstaden} i {Thailand}'],['Jakarta','{Huvudstaden} i {Indonesien}'],['Kairo','{Huvudstaden} i {Egypten}'],['Nairobi','{Huvudstaden} i {Kenya}'],
-['Abuja','{Huvudstaden} i {Nigeria}'],['Addis Abeba','{Huvudstaden} i {Etiopien}'],['Rabat','{Huvudstaden} i {Marocko}'],['Washington D.C.','{Huvudstaden} i {USA}'],
-['Ottawa','{Huvudstaden} i {Kanada}'],['Mexico City','{Huvudstaden} i {Mexiko}'],['Brasília','{Huvudstaden} i {Brasilien}'],['Buenos Aires','{Huvudstaden} i {Argentina}'],
-['Lima','{Huvudstaden} i {Peru}'],['Canberra','{Huvudstaden} i {Australien}'],['Wellington','{Huvudstaden} i {Nya Zeeland}'],['Ankara','{Huvudstaden} i {Turkiet}'],
-['Teheran','{Huvudstaden} i {Iran}'],['Moskva','{Huvudstaden} i {Ryssland}'],['Kyiv','{Huvudstaden} i {Ukraina}']]],
-
-['se-geo','Sveriges geografi','Sjöar, berg, landsdelar och städer.','sv-SE','sv-SE',true,[
-['Vänern','Sveriges {största} sjö'],['Vättern','Sveriges {näst största} sjö'],['Mälaren','Sveriges {tredje största} sjö'],['Kebnekaise','Sveriges {högsta} berg'],
-['Gotland','Sveriges {största} ö'],['Stockholm','Sveriges {huvudstad}'],['Götaland, Svealand och Norrland','Sveriges tre {landsdelar}'],['Landskap','Sverige har {25} landskap'],
-['Län','Sverige har {21} län'],['Göteborg','Sveriges {näst största} stad'],['Malmö','Sveriges {tredje största} stad'],['Skåne','Sveriges {sydligaste} landskap'],['Lappland','Sveriges {största} landskap']]],
-
-['se-hist','Svensk historia: årtal','Viktiga händelser och när de hände.','sv-SE','sv-SE',true,[
-['Kalmarunionen','Bildades år {1397}'],['Digerdöden','Kom till Sverige omkring år {1350}'],['Stockholms blodbad','Ägde rum år {1520}'],['Gustav Vasa','Valdes till kung år {1523}'],
-['Trettioåriga kriget','Sverige deltog {1630}–{1648}'],['Gustav II Adolf','Stupade vid {Lützen} år {1632}'],['Karl XII','Dog år {1718}'],['Frihetstiden','Varade {1718}–{1772}'],
-['Gustav III:s statskupp','Genomfördes år {1772}'],['Unionen med Norge','Varade {1814}–{1905}'],['Nobelpriset','Delades ut första gången år {1901}'],['Folkpensionen','Infördes år {1913}'],
-['Åttatimmarsdagen','Infördes år {1919}'],['Allmän rösträtt','Kvinnor fick rösta i riksdagsval första gången {1921}'],['Nya regeringsformen','Trädde i kraft år {1975}']]],
-
-['samhalle','Samhällskunskap: så styrs Sverige','Demokrati, riksdag, grundlagar och kommun.','sv-SE','sv-SE',true,[
-['Riksdagen','Sveriges {lagstiftande} församling med {349} ledamöter'],['Regeringen','Leds av {statsministern} och styr riket'],['Valperiod','Riksdagsval hålls vart {fjärde} år'],
-['Rösträtt','I riksdagsval får man rösta från {18} års ålder'],['Yttrandefrihet','Rätten att fritt uttrycka {åsikter}, skyddad i {grundlag}'],
-['Tryckfrihetsförordningen','Grundlag som skyddar {tryckfriheten}'],['Regeringsformen','Grundlag som beskriver {hur Sverige styrs}'],['Demokrati','Folkstyre, där makten utgår från {folket}'],
-['Proportionellt valsystem','Partierna får platser i förhållande till {antalet röster}'],['Kommun','Ansvarar bland annat för {skola} och {äldreomsorg}'],
-['Region','Ansvarar främst för {sjukvård}'],['EU','Sverige blev medlem år {1995}'],['Monarki','Sverige är en {konstitutionell} monarki med {kung} som statschef'],
-['Allemansrätten','Rätten att vistas i {naturen} utan att {störa} eller {förstöra}']]],
-
-['bio','Biologi: cellen och livets processer','Organeller, fotosyntes, cellandning och celldelning.','sv-SE','sv-SE',true,[
-['Cellkärna','Innehåller cellens {DNA} och styr cellens verksamhet'],['Mitokondrie','Cellens {kraftverk} som bildar energi i form av {ATP}'],['Ribosom','Här tillverkas {proteiner}'],
-['Kloroplast','Här sker {fotosyntesen} i växtceller'],['Cellvägg','Ger växtceller stadga och finns inte hos {djurceller}'],['Cellmembran','Styr vad som tar sig {in} och {ut} ur cellen'],
-['Lysosom','Bryter ner {avfall} och uttjänta cellstrukturer'],['Golgiapparat','Paketerar och skickar vidare {proteiner}'],['Vakuol','Lagrar {vatten} och näring i växtceller'],
-['Cytoplasma','Geléartad massa som fyller {cellen} och omger organellerna'],['Fotosyntes','Växter omvandlar {koldioxid} och {vatten} till {socker} och {syre}'],
-['Cellandning','Socker och {syre} omvandlas till {energi}, koldioxid och vatten'],['DNA','Bär på {arvsanlagen}, ordnat i {kromosomer}'],
-['Mitos','Celldelning där två {identiska} celler bildas'],['Meios','Celldelning som bildar {könsceller}']]],
-
-['elements','Kemi: grundämnen','Kemiska tecken och deras svenska namn.','','sv-SE',false,[
-['H','Väte'],['He','Helium'],['Li','Litium'],['C','Kol'],['N','Kväve'],['O','Syre'],['F','Fluor'],['Ne','Neon'],['Na','Natrium'],['Mg','Magnesium'],
-['Al','Aluminium'],['Si','Kisel'],['P','Fosfor'],['S','Svavel'],['Cl','Klor'],['K','Kalium'],['Ca','Kalcium'],['Fe','Järn'],['Cu','Koppar'],['Zn','Zink'],
-['Ag','Silver'],['Sn','Tenn'],['Au','Guld'],['Hg','Kvicksilver'],['Pb','Bly']]],
-
-['math','Matematik: formler och regler','Vanliga formler. Potenser skrivs med ^ (x^2 betyder x i kvadrat).','sv-SE','sv-SE',false,[
-['Pythagoras sats','a^2 + b^2 = c^2'],['Area av cirkel','π · r^2'],['Omkrets av cirkel','2 · π · r'],['Volym av klot','4 · π · r^3 / 3'],['Volym av kon','π · r^2 · h / 3'],
-['Derivatan av x^n','n · x^(n−1)'],['Derivatan av e^x','e^x'],['Derivatan av ln x','1/x'],['Primitiv funktion till 1/x','ln|x| + C'],
-['Trigonometriska ettan','sin^2 x + cos^2 x = 1'],['Andragradsekvationen x^2 + px + q = 0','x = −p/2 ± √((p/2)^2 − q)'],['Medelvärde','Summan av alla värden delat med antalet värden'],
-['Median','Det mittersta värdet när värdena står i storleksordning'],['Sannolikhet','Antalet gynnsamma utfall delat med antalet möjliga utfall']]],
-
-['en-basic','Engelska: vardagsord','Svenska ord till engelska. Flera rätta svar skiljs med komma.','sv-SE','en-US',false,[
-['hus','house'],['bil','car'],['hund','dog'],['katt','cat'],['vatten','water'],['bröd','bread'],['bok','book'],['skola','school'],['vän','friend'],['familj','family'],
-['glad','happy'],['ledsen','sad'],['snabb','fast, quick'],['långsam','slow'],['stor','big, large'],['liten','small, little'],['ny','new'],['gammal','old'],['varm','warm, hot'],['kall','cold'],
-['äta','eat'],['dricka','drink'],['sova','sleep'],['springa','run'],['läsa','read'],['skriva','write'],['fråga','ask'],['svara','answer, reply'],['glömma','forget'],['minnas','remember']]],
-
-['en-irreg','Engelska: oregelbundna verb','Infinitiv till imperfekt och particip. Skriv t.ex. went, gone.','en-US','en-US',false,[
-['be','was/were, been'],['begin','began, begun'],['break','broke, broken'],['bring','brought, brought'],['buy','bought, bought'],['choose','chose, chosen'],['come','came, come'],
-['do','did, done'],['drink','drank, drunk'],['drive','drove, driven'],['eat','ate, eaten'],['fall','fell, fallen'],['find','found, found'],['fly','flew, flown'],
-['forget','forgot, forgotten'],['give','gave, given'],['go','went, gone'],['know','knew, known'],['see','saw, seen'],['sing','sang, sung'],['swim','swam, swum'],
-['take','took, taken'],['write','wrote, written']]],
-
-['es-basic','Spanska: grundord','Vanliga spanska ord med svensk översättning.','es-ES','sv-SE',false,[
-['hola','hej'],['adiós','hejdå'],['gracias','tack'],['por favor','snälla'],['sí','ja'],['no','nej'],['agua','vatten'],['pan','bröd'],['casa','hus'],['perro','hund'],
-['gato','katt'],['libro','bok'],['amigo','vän'],['familia','familj'],['escuela','skola'],['comer','äta'],['beber','dricka'],['dormir','sova'],['hablar','prata'],['vivir','leva, bo'],
-['grande','stor'],['pequeño','liten'],['nuevo','ny'],['viejo','gammal'],['bueno','bra'],['malo','dålig'],['hoy','idag'],['mañana','imorgon'],['ayer','igår'],['siempre','alltid'],['nunca','aldrig']]],
-
-['de-basic','Tyska: grundord','Vanliga tyska ord med svensk översättning.','de-DE','sv-SE',false,[
-['das Haus','hus'],['der Hund','hund'],['die Katze','katt'],['das Wasser','vatten'],['das Brot','bröd'],['das Buch','bok'],['die Schule','skola'],['der Freund','vän'],
-['die Familie','familj'],['danke','tack'],['bitte','snälla, varsågod'],['ja','ja'],['nein','nej'],['heute','idag'],['morgen','imorgon'],['gestern','igår'],['immer','alltid'],
-['nie','aldrig'],['groß','stor'],['klein','liten'],['neu','ny'],['alt','gammal'],['gut','bra'],['schlecht','dålig'],['essen','äta'],['trinken','dricka'],['schlafen','sova'],
-['sprechen','prata'],['wohnen','bo'],['die Straße','gata']]],
-
-['fr-basic','Franska: grundord','Vanliga franska ord med svensk översättning.','fr-FR','sv-SE',false,[
-['la maison','hus'],['le chien','hund'],['le chat','katt'],['l’eau','vatten'],['le pain','bröd'],['le livre','bok'],['l’école','skola'],['l’ami','vän'],['la famille','familj'],
-['merci','tack'],['s’il vous plaît','snälla'],['oui','ja'],['non','nej'],['aujourd’hui','idag'],['demain','imorgon'],['hier','igår'],['toujours','alltid'],['jamais','aldrig'],
-['grand','stor'],['petit','liten'],['nouveau','ny'],['vieux','gammal'],['bon','bra'],['mauvais','dålig'],['manger','äta'],['boire','dricka'],['dormir','sova'],['parler','prata']]]
+['hp1','HP ord 1','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[['vederhäftig','tillförlitlig och sakligt trovärdig','En vederhäftig källa kan granskas av flera oberoende parter.'],['förfäkta','hävda eller ivrigt försvara en uppfattning','Hon fortsatte att förfäkta sin ståndpunkt trots kritiken.'],['tillvita','beskylla någon för något, ofta en klandervärd handling','Han försökte tillvita kollegan hela ansvaret för misstaget.'],['vidgå','erkänna något, särskilt något man helst vill förneka','Till slut tvingades hon vidgå att hon hade haft fel.'],['förmäten','övermodig och oblygt självsäker','Det var förmätet att tro att ingen skulle upptäcka fusket.'],['ådagalägga','visa eller påvisa tydligt','Forskaren lyckades ådagalägga ett tydligt samband mellan rökning och sjukdomen.'],['vederlägga','motbevisa med argument eller bevis','Med nya bevis kunde de vederlägga den gamla teorin.'],['försåtlig','lömsk eller utformad för att vilseleda','Han ställde en försåtlig fråga för att locka fram sanningen.'],['kallsinnig','känslokall och föga mottaglig för andras lidande','Chefen förblev kallsinnig inför medarbetarnas klagomål.'],['beskäftig','överdrivet ivrig att lägga sig i eller visa sin duglighet','Den beskäftiga grannen hade åsikter om allt.'],['avog','fientligt eller motvilligt inställd','Han var avog mot alla förslag som kom från den nya ledningen.'],['förnumstig','självbelåtet klok och mästrande','Med förnumstig min förklarade hon vad alla borde göra.'],['misshaglig','obehaglig eller motbjudande för någon','Beslutet väckte starka och misshagliga reaktioner.'],['förhärskande','dominerande eller allmänt rådande','Den förhärskande uppfattningen var länge att jorden stod stilla.'],['hävdvunnen','som grundar sig på gammal sed eller tradition','Det är hävdvunnet att gästen tackar för maten.'],['vedersakare','motståndare eller fiende','Han hade många vedersakare inom sitt eget parti.'],['förkovra','förbättra eller utveckla sina kunskaper och färdigheter','Hon reste utomlands för att förkovra sig i språket.'],['obstruera','hindra eller motarbeta ett förlopp avsiktligt','Oppositionen försökte obstruera beslutet med långa anföranden.'],['efemär','kortlivad eller snabbt övergående','Berömmelsen visade sig vara efemär och snart bortglömd.'],['inexorabel','obeveklig; går inte att hejda eller påverka','Utvecklingen tycktes inexorabel och gick inte att hejda.']],true],
+['hp2','HP ord 2','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[['klandervärd','värd att kritisera eller förebrå','Det var klandervärt att lämna olycksplatsen.'],['gängse','allmänt bruklig eller vedertagen','Det är gängse praxis att skicka ett tackmail efter intervjun.'],['förbehållslös','utan reservationer eller inskränkningar','Hon gav sitt förbehållslösa stöd till förslaget.'],['tillkortakommande','brist eller misslyckande i förhållande till förväntningar','Rapporten pekade på flera allvarliga tillkortakommanden.'],['förebrå','klandra någon för något','Ingen kan förebrå dig för att du försökte.'],['bestyrka','styrka riktigheten i något med belägg','Vittnet kunde bestyrka hennes berättelse.'],['förorda','rekommendera eller uttala sig till förmån för','Läkaren valde att förorda en försiktigare behandling.'],['förleda','lura eller locka någon att handla felaktigt','Han lät sig förledas av löftet om snabba pengar.'],['försumlig','vårdslös eller bristfällig i utförandet av sina skyldigheter','Den försumlige hyresvärden åtgärdade aldrig läckan.'],['beskaffenhet','egenskap eller det sätt på vilket något är beskaffat','Vi måste undersöka varans beskaffenhet innan vi köper den.'],['tillbörlig','lämplig, passande eller föreskriven enligt normer','Han visade tillbörlig respekt för de äldre.'],['förtänksam','förutseende och noga med att överväga följder','En förtänksam resenär har alltid en reservplan.'],['förringa','göra något mindre betydelsefullt än det är','Man bör inte förringa betydelsen av små steg.'],['översitteri','högfärdigt och nedlåtande beteende mot andra','Hans översitteri gjorde honom impopulär bland kollegerna.'],['befängd','orimlig eller absurd','Idén verkade först befängd men visade sig fungera.'],['förnimma','uppfatta eller ana genom sinnena eller intuitionen','Man kunde förnimma en svag doft av rök i rummet.'],['anstötlig','stötande eller kränkande enligt rådande normer','Hans anstötliga skämt uppskattades inte av alla.'],['förtret','irritation eller obehag orsakat av något','Förseningen vållade honom stor förtret.'],['försmädlig','hånfull eller sårande på ett förödmjukande sätt','Hon gav honom ett försmädligt leende.'],['undflyende','svår att fånga, precisera eller få ett tydligt svar från','Politikern gav ett undflyende svar på den direkta frågan.']],true],
+['hp3','HP ord 3','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[['tvetydig','som kan tolkas på minst två olika sätt','Hans tvetydiga svar gjorde ingen klokare.'],['lakonism','kortfattat uttryckssätt som säger mycket med få ord','Med typisk lakonism svarade han bara ja.'],['divergens','avvikelse eller skillnad mellan utvecklingslinjer eller uppfattningar','Det finns en tydlig divergens mellan teori och praktik.'],['lakun','lucka eller utelämnat parti i en text eller framställning','Forskaren upptäckte en lakun i källmaterialet.'],['deferent','undfallande och överdrivet respektfull','Han var alltför deferent mot sin chef.'],['peremptorisk','kategorisk och avvisar invändningar','Hon avfärdade frågan med en peremptorisk kommentar.'],['lättsinnig','oansvarig och obekymrad om följderna','Ett lättsinnigt löfte är lätt att ge och svårt att hålla.'],['förtegen','ovillig att lämna ut information','Han var förtegen om sina framtidsplaner.'],['burdus','grov, klumpig eller osmidig i sitt uppträdande','Hans burdusa skämt passade inte i sammanhanget.'],['intrikat','invecklad och svår att reda ut','Uppgiften visade sig mer intrikat än den såg ut.'],['prejudikat','tidigare avgörande som vägleder senare liknande fall','Domen blev ett prejudikat för liknande mål.'],['vankelmodig','obestämd och oförmögen att fatta beslut','Den vankelmodige ledaren ändrade ständigt uppfattning.'],['konnässör','person med stor sakkunskap och förfinad smak inom ett område','Som konnässör av vin kände hon igen druvan direkt.'],['impertinent','fräck och respektlös','Det var impertinent att avbryta talaren gång på gång.'],['inkongruent','bristande överensstämmelse; inte förenlig','Hans uppträdande var inkongruent med hans ord.'],['proskriptiv','föreskrivande eller förbudsorienterad','Reglerna är proskriptiva och anger vad som är förbjudet.'],['nedrig','småaktigt elak eller skamlig','Det var en nedrig handling att svika sin vän.'],['anfrätta','börja bryta ned eller angripa, exempelvis ett material eller en princip','Rost kan långsamt anfrätta metallen.'],['inhärdig','envis och uthållig i sin ståndpunkt','Han var inhärdig och gav sig aldrig.'],['prekognition','förmodad förmåga att förutse framtida händelser','Tron på prekognition är vanlig men vetenskapligt omstridd.']],true],
+['hp4','HP ord 4','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[['konnivens','tyst medgivande eller underförstådd tolerans av något otillåtet','Med ledningens tysta konnivens fortsatte fusket.'],['intransigent','kompromisslös och ovillig att ge efter','Facket stod intransigent i förhandlingarna.'],['bristfällig','ofullständig eller otillräcklig','Rapporten var bristfällig och saknade källor.'],['futil','fruktlös eller meningslös','Alla ansträngningar visade sig futila.'],['konsternation','bestörtning och förvirring','Nyheten möttes med stor konsternation.'],['exorbitant','orimligt hög eller överdriven','Priset på biljetterna var exorbitant.'],['pietetsfull','präglad av vördnad och varsam respekt','Han talade om sin far med pietetsfull respekt.'],['sangvinisk','optimistisk och tillitsfull inför framtiden','Trots motgångarna förblev hon sangvinisk.'],['kollationera','jämföra texter eller dokument för att upptäcka skillnader','Forskaren ägnade dagar åt att kollationera de gamla handskrifterna.'],['konfundera','förvirra eller bringa i villrådighet','Den krångliga instruktionen konfunderade alla.'],['ohemul','orimlig, obefogad eller oskälig','Kravet framstod som helt ohemult.'],['pervertera','förvränga eller förvanska något från dess ursprungliga form','Makten riskerar att pervertera även den bäste.'],['subreption','bedrägligt undanhållande av en viktig omständighet','Avtalet byggde på subreption och fick rivas upp.'],['obstinat','envis och motsträvig','Hon var obstinat och bytte aldrig uppfattning.'],['immanent','inneboende i något eller verkande inom dess gränser','Farorna är immanenta och finns i själva systemet.'],['insipid','fadd, smaklös eller andefattig','Filmen kändes insipid och saknade sting.'],['exeges','noggrann och systematisk tolkning av en text','Hans exeges av dikten var både noggrann och känslig.'],['obeaktad','förbisedd eller inte tagen i beaktande','Hennes insats förblev obeaktad av ledningen.'],['måttlös','utan måtta eller självbehärskning','Hans måttlösa optimism smittade av sig.'],['konvenans','det som anses passande enligt sociala normer','Han bröt mot konvenansen genom att komma i shorts.']],true],
+['hp5','HP ord 5','20 svåra ord i stil med ordförståelsedelen (ORD).','sv-SE','sv-SE',false,[['kasuistisk','inriktad på enskilda fall, ibland överdrivet detaljstyrd','Argumentationen var alltför kasuistisk och snäv.'],['indolent','slö, trög eller likgiltig','Han tog sig fram med ett indolent lugn.'],['kolloquial','vardaglig och samtalspräglad i språkbruket','En kolloquial stil är vardaglig och avslappnad.'],['kontrafaktisk','som utgår från vad som skulle ha hänt om verkligheten varit annorlunda','En kontrafaktisk fråga är vad som hade hänt om historien sett annorlunda ut.'],['retorsion','svarsåtgärd mot en annan parts åtgärd','Landet svarade med retorsion och införde egna tullar.'],['lakmustest','avgörande prov som avslöjar en egenskap eller ståndpunkt','Valet blev ett lakmustest för partiets värderingar.'],['försumma','underlåta att göra något som borde göras','Du får inte försumma dina plikter.'],['genmäle','svar eller invändning mot ett påstående','Han kom med ett skarpt genmäle mot kritiken.'],['hårdra','tolka eller tillämpa något alltför strikt','Man bör inte hårdra reglerna i onödan.'],['bevekelsegrund','motiv eller bakomliggande skäl till en handling','Hans bevekelsegrunder var svåra att genomskåda.'],['förskansning','skyddad ställning eller befäst plats','Fienden hade en stark förskansning på kullen.'],['misskund','barmhärtighet eller medlidande','Han visade ingen misskund mot sina motståndare.'],['rättrådig','rättvis och moraliskt hederlig','En rättrådig domare dömer utan att vika för påtryckningar.'],['saktmodig','mild, lugn och behärskad','Hon förblev saktmodig trots provokationerna.'],['tillbakavisande','avvisande eller avfärdande','Hans tillbakavisande av anklagelsen var tydligt.'],['obeveklig','som inte låter sig bevekas eller hejdas','Tiden är obeveklig och stannar för ingen.'],['utsaga','påstående eller yttrande','Vittnets utsaga stämde med övriga bevis.'],['föregiven','påstådd men inte nödvändigtvis verklig','Den föregivna experten visade sig sakna utbildning.'],['anbelanga','angå eller beröra någon','Detta ärende anbelangar alla medlemmar.'],['vidlyftig','omfattande och alltför omständlig','Han gav en vidlyftig redogörelse för hela förloppet.']],true],
+['hp-bygg','HP ordbyggnad','Prefix och ändelser (orddelar) som bygger svenska ord — nyckeln till att gissa okända ord i ORD.','sv-SE','sv-SE',false,[['a- / an-','Grekiskt prefix som betyder utan eller icke.','asymmetrisk = utan symmetri · anarki = utan härskare eller ordnad överhet'],['o- / van-','Svenska prefix som betyder inte eller utan.','ovederhäftig = inte tillförlitlig · vanartig = som inte uppför sig som förväntat'],['in- / im- / ir- / il-','Latinskt prefix som betyder inte. Formen rättar sig efter följande ljud.','inkompetent = inte kompetent · irrationell = inte rationell · illegal = olaglig · immateriell = inte materiell'],['dis-','Prefix som betyder åtskillnad, borttagande eller motsats.','diskvalificera = utesluta från behörighet · dissekera = skära sönder · disharmoni = bristande samklang'],['dys-','Prefix som betyder störd, bristfällig eller sjukligt nedsatt.','dysfunktionell = som inte fungerar normalt · dyslexi = svårighet att läsa · dysfori = nedstämdhet'],['anti-','Prefix som betyder mot eller riktad mot.','antites = motsats · antidot = motgift · antipatisk = som väcker motvilja'],['kontra-','Prefix som betyder mot, i motsats till eller som svar på.','kontradiktion = motsägelse · kontraproduktiv = som motverkar sitt eget syfte'],['pre-','Prefix som betyder före, i tid eller ordning.','prejudikat = tidigare rättsavgörande · prehistorisk = från tiden före historisk tid'],['pro-','Prefix som betyder för, framåt eller i stället för.','proaktiv = handlar i förväg · prolog = inledning till ett verk'],['post- / retro-','Prefix som betyder efter (i tid), respektive bakåt eller tillbaka.','postum = utgiven efter döden · retrospektiv = tillbakablickande · retroaktiv = verkande bakåt i tiden'],['inter- / intra-','Prefix som betyder mellan olika enheter, respektive inom en grupp.','internationell = mellan nationer · intramural = inom en institution eller grupp'],['sub- / super-','Prefix som betyder under, respektive över eller utöver.','subordination = underordning · superstruktur = överordnad struktur'],['före-','Prefix som betyder i förväg eller framför, i tid eller rum.','förebrå = klandra någon · förebygga = hindra i förväg · förebild = något att efterlikna · förekomma = finnas eller inträffa först'],['mono- / poly-','Prefix som betyder en eller ensam, respektive många.','monolog = tal av en person · monoteism = tro på en enda gud · polygon = månghörning · polygami = äktenskap med flera'],['homo- / hetero-','Prefix som betyder lika eller samma, respektive olik eller annan.','homogen = enhetlig · heterogen = blandad · homonym = ord med samma form men olika betydelse'],['hyper- / hypo-','Prefix som betyder över eller alltför mycket, respektive under eller för lite.','hyperaktiv = överdrivet aktiv · hyperbol = överdrift · hypotes = antagande att pröva · hypotermi = onormalt låg kroppstemperatur'],['meta-','Prefix som betyder efter, bortom eller om sig själv på en högre nivå.','metafysik = bortom det fysiska · metafor = bildlig omskrivning · metakognition = tankar om sitt eget tänkande'],['neo- / paleo-','Prefix som betyder ny, respektive gammal eller forntida.','neologi = nybildat ord · paleontologi = läran om forntida liv'],['pseudo-','Prefix som betyder falsk eller skenbar.','pseudonym = falskt namn · pseudovetenskap = något som utger sig för att vara vetenskap'],['omni- / pan-','Prefix som betyder allt eller alltigenom.','omnipotent = allsmäktig · omnivor = allätare · pandemi = sjukdom över hela världen'],['tele-','Prefix som betyder fjärran eller på avstånd.','telefon = ljud på avstånd · television = bild på avstånd · telepati = känsla över avstånd'],['syn- / sym-','Prefix som betyder med, tillsammans eller samtidigt.','sympati = medkänsla · symfoni = samklang · synonym = ord med samma betydelse'],['trans-','Prefix som betyder över, igenom eller bortom.','transport = förflyttning · transparent = genomskinlig · transcendens = överskridande av gräns'],['re-','Prefix som betyder åter, tillbaka eller på nytt.','rekonstruera = bygga upp igen · revidera = se över på nytt · reaktion = motverkan'],['de- / ex-','Prefix som betyder ned eller bort, respektive ut eller före detta.','degradera = sätta ned i rang · exkludera = stänga ute · excentrisk = utanför mitten'],['-lös','Ändelse som betyder utan eller som saknar.','samvetslös = utan samvete · grundlös = utan grund · fruktlös = utan resultat'],['-bar','Ändelse som bildar adjektiv av verb: som kan ...as eller som går att ...a. (Jämför: ett verb + denna ändelse = något som låter sig göras.)','mätbar = som kan mätas · läsbar = som går att läsa · försumbar = så liten att den kan försummas'],['-abel / -ibel','Ändelser som bildar adjektiv av verb med betydelsen möjlig att eller som kan.','acceptabel = möjlig att godta · plausibel = rimlig eller trovärdig'],['-ism','Ändelse som betecknar en lära, ideologi, riktning eller företeelse.','empirism = syn som betonar erfarenhet · pragmatism = inriktning på praktiska följder · anakronism = något felplacerat i tiden'],['-ist','Ändelse som betecknar en person som företräder en lära eller utövar en verksamhet.','empirist = anhängare av empirism · purist = någon som vill hålla något rent · nihilist = person som förnekar givna värden'],['-itet','Ändelse som bildar substantiv för en egenskap, ett tillstånd eller en grad.','validitet = giltighet · ambiguitet = tvetydighet · rigiditet = stelhet eller oflexibilitet'],['-fobi / -fil','Ändelse som betyder rädsla eller stark motvilja, respektive att tycka om eller dras till något.','xenofobi = främlingsfientlighet · hydrofob = vattenavstötande · bibliofil = bokälskare'],['bene- / mal-','Prefix som betyder väl eller gott, respektive dåligt eller illa.','benefik = välgörande eller förmånlig · malign = elakartad · malformation = missbildning'],['-logi / -logisk','Orddel som betecknar en lära, vetenskap eller systematisk undersökning.','ontologi = läran om varat · epistemologi = läran om kunskap · analogi = likhet mellan förhållanden'],['-ficera / -fikation','Orddelar som betyder att göra något till, skapa eller åstadkomma ett tillstånd.','klassificera = dela in i klasser · intensifiera = göra intensivare · verifikation = bekräftelse av riktighet'],['-het','Ändelse som bildar substantiv av adjektiv och betecknar en egenskap.','frihet = att vara fri · klarhet = att vara klar · möjlighet = att vara möjlig'],['-skap','Ändelse som bildar substantiv om tillstånd, samhörighet eller verksamhet.','vänskap = det att vara vän · kunskap = det att kunna · medlemskap = det att vara medlem'],['-ing / -ning','Ändelse som bildar substantiv av verb och betecknar en handling eller dess resultat.','prövning = det att pröva · utbildning = det att utbilda · förklaring = det att förklara'],['-sam / -full','Ändelser som bildar adjektiv: den ena betyder som har en benägenhet för, den andra som är fylld av.','arbetsam = flitig eller mödosam · vördsam = präglad av vördnad · hoppfull = fylld av hopp · betydelsefull = av stor betydelse'],['-aktig / -mässig','Ändelser som bildar adjektiv med betydelsen av det slaget, respektive enligt eller i linje med.','barnaktig = som ett barn · ordningsmässig = enligt ordningen · yrkesmässig = i yrkesutövning'],['-era','Ändelse som bildar verb, ofta med betydelsen göra, förse med eller syssla med.','kopiera = göra en kopia · duscha = tvätta sig · studera = ägna sig åt studier']],true],
+['eu-cap','Europas huvudstäder','Vilken stad är huvudstad i vilket land? Blanks gör att du tränar båda hållen.','sv-SE','sv-SE',true,[['Paris','{Huvudstaden} i {Frankrike}'],['Berlin','{Huvudstaden} i {Tyskland}'],['Madrid','{Huvudstaden} i {Spanien}'],['Rom','{Huvudstaden} i {Italien}'],['Lissabon','{Huvudstaden} i {Portugal}'],['London','{Huvudstaden} i {Storbritannien}'],['Dublin','{Huvudstaden} i {Irland}'],['Bryssel','{Huvudstaden} i {Belgien}'],['Amsterdam','{Huvudstaden} i {Nederländerna}'],['Bern','{Huvudstaden} i {Schweiz}'],['Wien','{Huvudstaden} i {Österrike}'],['Prag','{Huvudstaden} i {Tjeckien}'],['Warszawa','{Huvudstaden} i {Polen}'],['Budapest','{Huvudstaden} i {Ungern}'],['Köpenhamn','{Huvudstaden} i {Danmark}'],['Oslo','{Huvudstaden} i {Norge}'],['Helsingfors','{Huvudstaden} i {Finland}'],['Stockholm','{Huvudstaden} i {Sverige}'],['Aten','{Huvudstaden} i {Grekland}'],['Reykjavik','{Huvudstaden} i {Island}'],['Vilnius','{Huvudstaden} i {Litauen}'],['Riga','{Huvudstaden} i {Lettland}'],['Tallinn','{Huvudstaden} i {Estland}'],['Bukarest','{Huvudstaden} i {Rumänien}'],['Sofia','{Huvudstaden} i {Bulgarien}'],['Belgrad','{Huvudstaden} i {Serbien}'],['Zagreb','{Huvudstaden} i {Kroatien}']]],
+['world-cap','Världens huvudstäder','Huvudstäder utanför Europa.','sv-SE','sv-SE',true,[['Tokyo','{Huvudstaden} i {Japan}'],['Peking','{Huvudstaden} i {Kina}'],['Seoul','{Huvudstaden} i {Sydkorea}'],['New Delhi','{Huvudstaden} i {Indien}'],['Bangkok','{Huvudstaden} i {Thailand}'],['Jakarta','{Huvudstaden} i {Indonesien}'],['Kairo','{Huvudstaden} i {Egypten}'],['Nairobi','{Huvudstaden} i {Kenya}'],['Abuja','{Huvudstaden} i {Nigeria}'],['Addis Abeba','{Huvudstaden} i {Etiopien}'],['Rabat','{Huvudstaden} i {Marocko}'],['Washington D.C.','{Huvudstaden} i {USA}'],['Ottawa','{Huvudstaden} i {Kanada}'],['Mexico City','{Huvudstaden} i {Mexiko}'],['Brasília','{Huvudstaden} i {Brasilien}'],['Buenos Aires','{Huvudstaden} i {Argentina}'],['Lima','{Huvudstaden} i {Peru}'],['Canberra','{Huvudstaden} i {Australien}'],['Wellington','{Huvudstaden} i {Nya Zeeland}'],['Ankara','{Huvudstaden} i {Turkiet}'],['Teheran','{Huvudstaden} i {Iran}'],['Moskva','{Huvudstaden} i {Ryssland}'],['Kyiv','{Huvudstaden} i {Ukraina}']]],
+['se-geo','Sveriges geografi','Sjöar, berg, landsdelar och städer.','sv-SE','sv-SE',true,[['Vänern','Sveriges {största} sjö'],['Vättern','Sveriges {näst största} sjö'],['Mälaren','Sveriges {tredje största} sjö'],['Kebnekaise','Sveriges {högsta} berg'],['Gotland','Sveriges {största} ö'],['Stockholm','Sveriges {huvudstad}'],['Götaland, Svealand och Norrland','Sveriges tre {landsdelar}'],['Landskap','Sverige har {25} landskap'],['Län','Sverige har {21} län'],['Göteborg','Sveriges {näst största} stad'],['Malmö','Sveriges {tredje största} stad'],['Skåne','Sveriges {sydligaste} landskap'],['Lappland','Sveriges {största} landskap']]],
+['se-hist','Svensk historia: årtal','Viktiga händelser och när de hände.','sv-SE','sv-SE',true,[['Kalmarunionen','Bildades år {1397}'],['Digerdöden','Kom till Sverige omkring år {1350}'],['Stockholms blodbad','Ägde rum år {1520}'],['Gustav Vasa','Valdes till kung år {1523}'],['Trettioåriga kriget','Sverige deltog {1630}–{1648}'],['Gustav II Adolf','Stupade vid {Lützen} år {1632}'],['Karl XII','Dog år {1718}'],['Frihetstiden','Varade {1718}–{1772}'],['Gustav III:s statskupp','Genomfördes år {1772}'],['Unionen med Norge','Varade {1814}–{1905}'],['Nobelpriset','Delades ut första gången år {1901}'],['Folkpensionen','Infördes år {1913}'],['Åttatimmarsdagen','Infördes år {1919}'],['Allmän rösträtt','Kvinnor fick rösta i riksdagsval första gången {1921}'],['Nya regeringsformen','Trädde i kraft år {1975}']]],
+['samhalle','Samhällskunskap: så styrs Sverige','Demokrati, riksdag, grundlagar och kommun.','sv-SE','sv-SE',true,[['Riksdagen','Sveriges {lagstiftande} församling med {349} ledamöter'],['Regeringen','Leds av {statsministern} och styr riket'],['Valperiod','Riksdagsval hålls vart {fjärde} år'],['Rösträtt','I riksdagsval får man rösta från {18} års ålder'],['Yttrandefrihet','Rätten att fritt uttrycka {åsikter}, skyddad i {grundlag}'],['Tryckfrihetsförordningen','Grundlag som skyddar {tryckfriheten}'],['Regeringsformen','Grundlag som beskriver {hur Sverige styrs}'],['Demokrati','Folkstyre, där makten utgår från {folket}'],['Proportionellt valsystem','Partierna får platser i förhållande till {antalet röster}'],['Kommun','Ansvarar bland annat för {skola} och {äldreomsorg}'],['Region','Ansvarar främst för {sjukvård}'],['EU','Sverige blev medlem år {1995}'],['Monarki','Sverige är en {konstitutionell} monarki med {kung} som statschef'],['Allemansrätten','Rätten att vistas i {naturen} utan att {störa} eller {förstöra}']]],
+['bio','Biologi: cellen och livets processer','Organeller, fotosyntes, cellandning och celldelning.','sv-SE','sv-SE',true,[['Cellkärna','Innehåller cellens {DNA} och styr cellens verksamhet'],['Mitokondrie','Cellens {kraftverk} som bildar energi i form av {ATP}'],['Ribosom','Här tillverkas {proteiner}'],['Kloroplast','Här sker {fotosyntesen} i växtceller'],['Cellvägg','Ger växtceller stadga och finns inte hos {djurceller}'],['Cellmembran','Styr vad som tar sig {in} och {ut} ur cellen'],['Lysosom','Bryter ner {avfall} och uttjänta cellstrukturer'],['Golgiapparat','Paketerar och skickar vidare {proteiner}'],['Vakuol','Lagrar {vatten} och näring i växtceller'],['Cytoplasma','Geléartad massa som fyller {cellen} och omger organellerna'],['Fotosyntes','Växter omvandlar {koldioxid} och {vatten} till {socker} och {syre}'],['Cellandning','Socker och {syre} omvandlas till {energi}, koldioxid och vatten'],['DNA','Bär på {arvsanlagen}, ordnat i {kromosomer}'],['Mitos','Celldelning där två {identiska} celler bildas'],['Meios','Celldelning som bildar {könsceller}']]],
+['elements','Kemi: grundämnen','Kemiska tecken och deras svenska namn.','','sv-SE',false,[['H','Väte'],['He','Helium'],['Li','Litium'],['C','Kol'],['N','Kväve'],['O','Syre'],['F','Fluor'],['Ne','Neon'],['Na','Natrium'],['Mg','Magnesium'],['Al','Aluminium'],['Si','Kisel'],['P','Fosfor'],['S','Svavel'],['Cl','Klor'],['K','Kalium'],['Ca','Kalcium'],['Fe','Järn'],['Cu','Koppar'],['Zn','Zink'],['Ag','Silver'],['Sn','Tenn'],['Au','Guld'],['Hg','Kvicksilver'],['Pb','Bly']]],
+['math','Matematik: formler och regler','Vanliga formler. Potenser skrivs med ^ (x^2 betyder x i kvadrat).','sv-SE','sv-SE',false,[['Pythagoras sats','a^2 + b^2 = c^2'],['Area av cirkel','π · r^2'],['Omkrets av cirkel','2 · π · r'],['Volym av klot','4 · π · r^3 / 3'],['Volym av kon','π · r^2 · h / 3'],['Derivatan av x^n','n · x^(n−1)'],['Derivatan av e^x','e^x'],['Derivatan av ln x','1/x'],['Primitiv funktion till 1/x','ln|x| + C'],['Trigonometriska ettan','sin^2 x + cos^2 x = 1'],['Andragradsekvationen x^2 + px + q = 0','x = −p/2 ± √((p/2)^2 − q)'],['Medelvärde','Summan av alla värden delat med antalet värden'],['Median','Det mittersta värdet när värdena står i storleksordning'],['Sannolikhet','Antalet gynnsamma utfall delat med antalet möjliga utfall']]],
+['en-basic','Engelska: vardagsord','Svenska ord till engelska. Flera rätta svar skiljs med komma.','sv-SE','en-US',false,[['hus','house','They live in a big house.'],['bil','car','My car is blue.'],['hund','dog','The dog is barking.'],['katt','cat','The cat sleeps on the sofa.'],['vatten','water','Please give me some water.'],['bröd','bread','We bought fresh bread.'],['bok','book','This book is interesting.'],['skola','school','The children go to school.'],['vän','friend','She is my best friend.'],['familj','family','My family lives in Spain.'],['glad','happy','I am happy today.'],['ledsen','sad','He looked sad.'],['snabb','fast, quick','That car is very fast.'],['långsam','slow','The train was slow.'],['stor','big, large','It is a big city.'],['liten','small, little','She has a small dog.'],['ny','new','I bought a new phone.'],['gammal','old','This is an old house.'],['varm','warm, hot','The water is warm.'],['kall','cold','The weather is cold.'],['äta','eat','We eat dinner at seven.'],['dricka','drink','I drink coffee every morning.'],['sova','sleep','Babies sleep a lot.'],['springa','run','I run every day.'],['läsa','read','She reads a book.'],['skriva','write','Write your name here.'],['fråga','ask','May I ask a question?'],['svara','answer, reply','Please answer the question.'],['glömma','forget','Do not forget your keys.'],['minnas','remember','I remember that day.']],true],
+['en-irreg','Engelska: oregelbundna verb','Infinitiv till imperfekt och particip. Skriv t.ex. went, gone.','en-US','en-US',false,[['be','was/were, been','I want to be free. She was angry. They have been to Rome.'],['begin','began, begun','The film begins at eight. It began to rain. The show has begun.'],['break','broke, broken','Do not break the glass. He broke his arm. The window is broken.'],['bring','brought, brought','Bring an umbrella. She brought cake. He has brought good news.'],['buy','bought, bought','I want to buy a car. She bought bread. We have bought a house.'],['choose','chose, chosen','Choose one. He chose the blue one. She has chosen wisely.'],['come','came, come','Come here. He came home late. Spring has come.'],['do','did, done','Do your best. She did the dishes. I have done my homework.'],['drink','drank, drunk','Drink water. He drank the whole glass. She has drunk too much coffee.'],['drive','drove, driven','I can drive. He drove all night. They have driven far.'],['eat','ate, eaten','We eat at six. She ate the cake. I have eaten already.'],['fall','fell, fallen','Leaves fall in autumn. He fell asleep. The snow has fallen.'],['find','found, found','I cannot find my keys. She found a coin. We have found a solution.'],['fly','flew, flown','Birds fly south. He flew to London. They have flown home.'],['forget','forgot, forgotten','Do not forget the milk. I forgot your name. She has forgotten her key.'],['give','gave, given','Give me a hand. He gave a speech. They have given up.'],['go','went, gone','I want to go home. She went out. He has gone to bed.'],['know','knew, known','I know the answer. She knew the truth. We have known each other for years.'],['see','saw, seen','I can see the sea. He saw a film. Have you seen my hat?'],['sing','sang, sung','I like to sing. She sang a song. They have sung together.'],['swim','swam, swum','Can you swim? He swam across. She has swum in the lake.'],['take','took, taken','Take a seat. He took the bus. I have taken many photos.'],['write','wrote, written','Write your name. She wrote a letter. He has written a book.']],true],
+['es-basic','Spanska: grundord','Vanliga spanska ord med svensk översättning.','es-ES','sv-SE',false,[['hola','hej','¡Hola! ¿Cómo estás?'],['adiós','hejdå','Adiós, nos vemos mañana.'],['gracias','tack','Muchas gracias por tu ayuda.'],['por favor','snälla','Un café, por favor.'],['sí','ja','Sí, quiero ir.'],['no','nej','No, gracias.'],['agua','vatten','El agua está fría.'],['pan','bröd','El pan está fresco.'],['casa','hus','Mi casa es pequeña.'],['perro','hund','El perro juega en el jardín.'],['gato','katt','El gato duerme.'],['libro','bok','Leo un libro.'],['amigo','vän','Mi amigo es simpático.'],['familia','familj','Mi familia vive aquí.'],['escuela','skola','Los niños van a la escuela.'],['comer','äta','Quiero comer algo.'],['beber','dricka','Me gusta beber agua.'],['dormir','sova','Voy a dormir ahora.'],['hablar','prata','¿Puedes hablar más despacio?'],['vivir','leva, bo','Vivo en Estocolmo.'],['grande','stor','La ciudad es grande.'],['pequeño','liten','El piso es pequeño.'],['nuevo','ny','Tengo un coche nuevo.'],['viejo','gammal','Es un edificio viejo.'],['bueno','bra','El libro es muy bueno.'],['malo','dålig','El tiempo es malo hoy.'],['hoy','idag','Hoy hace sol.'],['mañana','imorgon','Mañana voy al trabajo.'],['ayer','igår','Ayer llovió.'],['siempre','alltid','Siempre desayuno a las ocho.'],['nunca','aldrig','Nunca bebo café por la noche.']],true],
+['de-basic','Tyska: grundord','Vanliga tyska ord med svensk översättning.','de-DE','sv-SE',false,[['das Haus','hus','Das Haus ist groß.'],['der Hund','hund','Der Hund spielt im Garten.'],['die Katze','katt','Die Katze schläft.'],['das Wasser','vatten','Das Wasser ist kalt.'],['das Brot','bröd','Das Brot ist frisch.'],['das Buch','bok','Ich lese ein Buch.'],['die Schule','skola','Die Kinder gehen in die Schule.'],['der Freund','vän','Mein Freund ist nett.'],['die Familie','familj','Meine Familie wohnt hier.'],['danke','tack','Danke für deine Hilfe.'],['bitte','snälla, varsågod','Ein Kaffee, bitte.'],['ja','ja','Ja, gern.'],['nein','nej','Nein, danke.'],['heute','idag','Heute ist es sonnig.'],['morgen','imorgon','Morgen fahre ich zur Arbeit.'],['gestern','igår','Gestern hat es geregnet.'],['immer','alltid','Ich trinke immer Kaffee.'],['nie','aldrig','Ich trinke nie Alkohol.'],['groß','stor','Die Stadt ist groß.'],['klein','liten','Die Wohnung ist klein.'],['neu','ny','Ich habe ein neues Auto.'],['alt','gammal','Das ist ein altes Haus.'],['gut','bra','Das Essen ist gut.'],['schlecht','dålig','Das Wetter ist schlecht.'],['essen','äta','Wir essen um sechs.'],['trinken','dricka','Ich trinke Wasser.'],['schlafen','sova','Die Kinder schlafen schon.'],['sprechen','prata','Sprechen Sie Deutsch?'],['wohnen','bo','Ich wohne in Berlin.'],['die Straße','gata','Die Straße ist lang.']],true],
+['fr-basic','Franska: grundord','Vanliga franska ord med svensk översättning.','fr-FR','sv-SE',false,[['la maison','hus','La maison est grande.'],['le chien','hund','Le chien joue dans le jardin.'],['le chat','katt','Le chat dort.'],['l’eau','vatten','L’eau est froide.'],['le pain','bröd','Le pain est frais.'],['le livre','bok','Je lis un livre.'],['l’école','skola','Les enfants vont à l’école.'],['l’ami','vän','Mon ami est gentil.'],['la famille','familj','Ma famille habite ici.'],['merci','tack','Merci beaucoup.'],['s’il vous plaît','snälla','Un café, s’il vous plaît.'],['oui','ja','Oui, avec plaisir.'],['non','nej','Non, merci.'],['aujourd’hui','idag','Aujourd’hui, il fait beau.'],['demain','imorgon','Demain, je vais travailler.'],['hier','igår','Hier, il a plu.'],['toujours','alltid','Je bois toujours du café.'],['jamais','aldrig','Je ne bois jamais d’alcool.'],['grand','stor','La ville est grande.'],['petit','liten','L’appartement est petit.'],['nouveau','ny','J’ai une nouvelle voiture.'],['vieux','gammal','C’est une vieille maison.'],['bon','bra','Le repas est bon.'],['mauvais','dålig','Le temps est mauvais.'],['manger','äta','Nous mangeons à six heures.'],['boire','dricka','Je bois de l’eau.'],['dormir','sova','Les enfants dorment déjà.'],['parler','prata','Parlez-vous français?']],true]
 ];
 
 /* Built-in decks keyed by id, plus helpers for linked ("saved") decks.
@@ -825,14 +754,14 @@ const BUILTIN=[
    built-in deck updates everyone who saved it. Editing a linked deck detaches
    it first (see editView's save()). */
 const BUILTIN_BY_ID={};
-BUILTIN.forEach(b=>{BUILTIN_BY_ID[b[0]]={id:b[0],title:b[1],desc:b[2],langW:b[3],langD:b[4],choize:b[5],cards:b[6]};});
+BUILTIN.forEach(b=>{BUILTIN_BY_ID[b[0]]={id:b[0],title:b[1],desc:b[2],langW:b[3],langD:b[4],choize:b[5],cards:b[6],example:!!b[7]};});
 const builtinOf=src=>{const m=/^bi:(.+)$/.exec(String(src||''));return m?BUILTIN_BY_ID[m[1]]||null:null;};
-const deckSnap=d=>JSON.stringify([d.title,d.desc||'',!!d.choize,d.langW||'',d.langD||'',d.cards]);
+const deckSnap=d=>JSON.stringify([d.title,d.desc||'',!!d.choize,d.langW||'',d.langD||'',!!d.example,d.cards]);
 function hydrateDeck(d){
   const b=builtinOf(d&&d.src);if(!b)return false;
   const before=deckSnap(d);
-  d.title=b.title;d.desc=b.desc;d.choize=!!b.choize;d.langW=b.langW||'';d.langD=b.langD||'';
-  d.cards=b.cards.map((c,i)=>({id:'bi:'+b.id+':'+i,w:c[0],d:c[1]}));
+  d.title=b.title;d.desc=b.desc;d.choize=!!b.choize;d.langW=b.langW||'';d.langD=b.langD||'';d.example=!!b.example;
+  d.cards=b.cards.map((c,i)=>({id:'bi:'+b.id+':'+i,w:c[0],d:c[1],e:c[2]||''}));
   return deckSnap(d)!==before;
 }
 function hydrateAll(){
@@ -853,15 +782,8 @@ function linkBuiltinCopies(){
   return changed;
 }
 
-function migrate(){
-  const changed=[];
-  S.decks.slice().forEach(d=>{
-    if(!d.example)return;
-    if(d.stats&&(d.stats.matchPlays||(d.stats.tests||[]).length)){delete d.example;changed.push(d);}
-    else removeDeck(d.id);
-  });
-  return changed;
-}
+/* (The old `example` marker for seeded demo decks was retired; `example` now
+   means "this deck has an example field on each card".) */
 function lsSave(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 function lsLoad(){try{const t=localStorage.getItem(KEY);return t?JSON.parse(t):null;}catch(e){return null;}}
 
@@ -925,7 +847,7 @@ function pruneReview(silent){
   S.review=S.review.filter(r=>{const d=deckById(r.deck);return d&&d.cards.some(c=>c.id===r.card);});
   if(!silent&&S.review.length!==n)touchMeta();
 }
-const sc=(deck,c)=>({id:c.id,w:c.w,d:c.d,wi:c.wi,di:c.di,deck});
+const sc=(deck,c)=>({id:c.id,w:c.w,d:c.d,e:c.e||'',wi:c.wi,di:c.di,deck});
 
 /* ----- continue where you left off ----- */
 const RESUME_NAMES={flash:'Flashcards',write:'Write',learn:'Learn'};
@@ -1192,7 +1114,6 @@ async function connectDb(){
   hydrateAll();
   if(!S.linked){if(linkBuiltinCopies())hydrateAll();S.linked=true;touchMeta();}
   S.seeded=true;
-  migrate().forEach(touchDeck);
   startPublic();
   pruneReview(true);
   if(!col&&!localLoaded)lsSave();
@@ -1482,10 +1403,10 @@ function exportView(p){
 function editView(p){
   const orig=p.id?deckById(p.id):null;
   if(p.id&&!orig)return missing();
-  const blank=()=>({id:uid(),w:'',d:''});
+  const blank=()=>({id:uid(),w:'',d:'',e:''});
   let saved=null;
   if(p.restore){try{const o=JSON.parse(sessionStorage.getItem(DKEY)||'null');if(o&&o.forId===(p.id||null))saved=o.draft;}catch(e){}}
-  const draft=saved||(orig?clone(orig):{id:uid(),title:'',desc:'',choize:true,langW:'',langD:'',cards:[blank()],created:Date.now()});
+  const draft=saved||(orig?clone(orig):{id:uid(),title:'',desc:'',choize:true,example:false,langW:'',langD:'',cards:[blank()],created:Date.now()});
   if(!draft.cards||!draft.cards.length)draft.cards=[blank()];
   draft.langW=draft.langW||'';draft.langD=draft.langD||'';
   const newImgs=new Set();
@@ -1502,6 +1423,9 @@ function editView(p){
 
   const sw=h('button',{type:'button',role:'switch',class:'switch',id:'f-choize','aria-labelledby':'choize-l','aria-checked':String(draft.choize),onclick:()=>{
     draft.choize=!draft.choize;sw.setAttribute('aria-checked',String(draft.choize));persist();renderSlots();
+  }},h('span',{class:'knob'}));
+  const exSw=h('button',{type:'button',role:'switch',class:'switch',id:'f-example','aria-labelledby':'example-l','aria-checked':String(!!draft.example),onclick:()=>{
+    draft.example=!draft.example;exSw.setAttribute('aria-checked',String(draft.example));persist();renderSlots();
   }},h('span',{class:'knob'}));
   const infoBtn=h('button',{type:'button','aria-label':'What is Fill in the blank?','aria-expanded':'false',onclick:()=>{
     const o=info.classList.toggle('open');infoBtn.setAttribute('aria-expanded',String(o));
@@ -1559,6 +1483,7 @@ function editView(p){
         if(e.key!=='Enter')return;
         e.preventDefault();
         if(side==='w'){document.getElementById('d-'+c.id).focus();return;}
+        if(draft.example){const ex=document.getElementById('e-'+c.id);if(ex){ex.focus();return;}}
         const nx=draft.cards[i+1];
         if(nx)document.getElementById('w-'+nx.id).focus();else addAfter(i);
       }});
@@ -1580,8 +1505,35 @@ function editView(p){
         h('button',{type:'button',class:'fmt imgb',title:'Add an image (you can also paste one)','aria-label':'Add an image to '+(side==='w'?'word ':'definition ')+(i+1),onclick:()=>file.click()},icon('image'),'Image'),
         file));
   }
+  function exCell(c,i){
+    const pv=h('div',{class:'preview'});
+    const upd=()=>{
+      if(/[*{]/.test(c.e||'')){pv.replaceChildren(h('span',{class:'pv-l'},'Preview'),previewNode(c.e));pv.hidden=false;}
+      else pv.hidden=true;
+    };
+    const inp=h('input',{id:'e-'+c.id,class:'in',type:'text',maxlength:'320',placeholder:'Example (shown after the answer)','aria-label':'Example '+(i+1),value:c.e||'',
+      oninput:e=>{c.e=e.target.value;upd();persist();},
+      onfocus:()=>{lastField=inp;},
+      onkeydown:e=>{
+        if((e.ctrlKey||e.metaKey)&&(e.key==='b'||e.key==='i')){e.preventDefault();const m=e.key==='b'?'**':'*';wrapSel(inp,m,m);return;}
+        if(e.key!=='Enter')return;
+        e.preventDefault();
+        const nx=draft.cards[i+1];
+        if(nx)document.getElementById('w-'+nx.id).focus();else addAfter(i);
+      }});
+    upd();
+    const fbtn=(label,tip,l,r,cls)=>h('button',{type:'button',class:'fmt '+(cls||''),title:tip,'aria-label':tip,onclick:()=>wrapSel(inp,l,r)},label);
+    return h('div',{class:'cell ce'},
+      h('span',{class:'cell-lbl'},'Example'),
+      inp,
+      pv,
+      h('div',{class:'cell-t'},
+        h('span',{class:'fmt-group'},fbtn('B','Make the selected text bold','**','**','b'),fbtn('I','Make the selected text italic','*','*','it')),
+        h('span',{class:'exnote'},'Shown after the answer')));
+  }
   function renderSlots(focusId){
     lastField=null;
+    slotsBox.classList.toggle('has-ex',!!draft.example);
     slotsBox.replaceChildren(...draft.cards.map(slot));
     countEl.textContent=draft.cards.length+(draft.cards.length===1?' card':' cards');
     persist();
@@ -1589,12 +1541,12 @@ function editView(p){
   }
   function addAfter(i){const c=blank();draft.cards.splice(i+1,0,c);renderSlots('w-'+c.id);}
   function removeAt(i){
-    if(draft.cards.length===1){const c=draft.cards[0];c.w='';c.d='';c.wi=null;c.di=null;renderSlots('w-'+c.id);return;}
+    if(draft.cards.length===1){const c=draft.cards[0];c.w='';c.d='';c.e='';c.wi=null;c.di=null;renderSlots('w-'+c.id);return;}
     draft.cards.splice(i,1);renderSlots();
   }
   function slot(c,i){
     return h('div',{class:'slot'},
-      h('span',{class:'slot-n'},String(i+1)),cell(c,'w',i),cell(c,'d',i),
+      h('span',{class:'slot-n'},String(i+1)),cell(c,'w',i),cell(c,'d',i),draft.example?exCell(c,i):null,
       h('div',{class:'slot-a'},
         h('button',{type:'button',class:'icon-btn',title:'Remove this card','aria-label':'Remove card '+(i+1),onclick:()=>removeAt(i)},icon('trash'))));
   }
@@ -1613,7 +1565,7 @@ function editView(p){
   }
   function doBulk(){
     const r=parseBulk(bulk.value,bulkSep);if(!r.pairs.length)return;
-    const added=r.pairs.map(x=>({id:uid(),w:x.w,d:x.d}));
+    const added=r.pairs.map(x=>({id:uid(),w:x.w,d:x.d,e:''}));
     const kept=draft.cards.filter(c=>c.w.trim()||c.d.trim()||c.wi||c.di);
     draft.cards=kept.concat(added);
     bulk.value='';updBulk();renderSlots();
@@ -1629,17 +1581,18 @@ function editView(p){
     if(!t){err.textContent='Give the deck a title.';title.focus();return;}
     const out=[];
     for(let i=0;i<draft.cards.length;i++){
-      const c=draft.cards[i],w=c.w.trim(),d=c.d.trim();
-      if(!w&&!d&&!c.wi&&!c.di)continue;
+      const c=draft.cards[i],w=c.w.trim(),d=c.d.trim(),ex=(c.e||'').trim();
+      if(!w&&!d&&!ex&&!c.wi&&!c.di)continue;
       if(!w||!d){err.textContent='Card '+(i+1)+' is missing its '+(w?'definition':'word')+'.';const el=document.getElementById((w?'d-':'w-')+c.id);if(el)el.focus();return;}
       const card={id:c.id,w,d};
+      if(draft.example&&ex)card.e=ex;
       if(c.wi&&S.images[c.wi])card.wi=c.wi;
       if(c.di&&S.images[c.di])card.di=c.di;
       out.push(card);
     }
     if(!out.length){err.textContent='Add at least one card with a word and a definition.';return;}
     let target;
-    const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,langW:draft.langW,langD:draft.langD,cards:out};
+    const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,example:!!draft.example,langW:draft.langW,langD:draft.langD,cards:out};
     if(orig){Object.assign(orig,fields);if(orig.src){delete orig.src;orig.noLink=true;}target=orig;}
     else{target=Object.assign({id:draft.id,created:draft.created},fields);S.decks.push(target);}
     touchDeck(target);syncImages(Array.from(newImgs));pruneReview(false);
@@ -1657,12 +1610,16 @@ function editView(p){
         h('div',{class:'setting-l'},
           h('div',{class:'row',style:'gap:4px'},h('strong',{id:'choize-l'},'Fill in the blank'),info),
           h('p',{class:'hint'},'Fill-in-the-blank cards. Put a word in {curly brackets} and it becomes a blank when you practise.')),sw),
+      h('div',{class:'setting'},
+        h('div',{class:'setting-l'},
+          h('strong',{id:'example-l'},'Example'),
+          h('p',{class:'hint'},'Adds a third field to each card. An example is shown only after you answer — never in the question or the choices.')),exSw),
       TTS?h('div',{class:'field'},h('span',{class:'lbl'},'Read aloud languages'),
         h('div',{class:'two'},langSel('f-lw','langW','Words'),langSel('f-ld','langD','Definitions')),
         h('p',{class:'hint'},'Used by the speaker buttons. Your device needs a voice for the language.')):null,
       h('div',{class:'field'},
         h('div',{class:'sec-h',style:'margin-bottom:0'},h('span',{class:'lbl'},'Cards'),countEl),
-        h('p',{class:'hint'},'Click into a box to see its tools: make the selected text bold, italic'+(draft.choize?' or a blank':'')+'. You can also add an image to either side.'),
+        h('p',{class:'hint'},'Click into a box to see its tools: make the selected text bold, italic'+(draft.choize?' or a blank':'')+(draft.example?', and fill in an example':'')+'. You can also add an image to either side.'),
         slotsBox,
         btn('Add card',{cls:'ghost add-card',icon:'plus',onclick:()=>addAfter(draft.cards.length-1)})),
       h('details',{class:'paste'},
@@ -1704,8 +1661,10 @@ function flashView(p){
   function paintFace(){
     const c=order[i],s=sideShown(),text=c[s],img=s==='w'?c.wi:c.di;
     face.classList.toggle('back',flipped);
-    face.replaceChildren(h('span',{class:'fc-label'},s==='w'?'Word':'Definition'),
-      h('div',{class:'fc-body'},cimg(img,'fc-img'),h('div',{class:'fc-text '+fcClass(plain(text))},rich(text))));
+    const kids=[h('span',{class:'fc-label'},s==='w'?'Word':'Definition'),
+      h('div',{class:'fc-body'},cimg(img,'fc-img'),h('div',{class:'fc-text '+fcClass(plain(text))},rich(text)))];
+    if(flipped&&deck.example&&c.e&&String(c.e).trim())kids.push(exLine(c.e));
+    face.replaceChildren(...kids);
     cnt.textContent=(i+1)+' / '+total;
     prev.disabled=i===0;next.disabled=i===total-1;
   }
@@ -2009,7 +1968,8 @@ function writeEngine(box,cards,o){
       ok&&aiAccepted?h('p',null,'The AI accepted your wording as equivalent to the answer.'):null,
       !ok&&given&&cur.mode!=='mc'?h('p',null,'You wrote: ',h('span',{class:'ans-bad'},given)):null,
       !ok?h('p',null,'Answer: ',h('span',{class:'ans-good'},answer)):null,
-      ok&&cur.mode!=='mc'?h('p',null,h('span',{class:'ans-good'},answer)):null);
+      ok&&cur.mode!=='mc'?h('p',null,h('span',{class:'ans-good'},answer)):null,
+      (c.deck.example&&c.e&&String(c.e).trim())?exLine(c.e):null);
     const cont=btn('Continue',{cls:'primary',onclick:()=>advance(ok)});
     const acts=h('div',{class:'row'},cont);
     if(TTS){
@@ -2444,6 +2404,7 @@ function testView(p){
       return h('article',{class:'q '+(q.ok?'ok':'bad')},
         h('div',{class:'q-top'},h('span',null,(i+1)+' · '+TYPE_LABEL[q.type])),
         q.type==='tf'?h('div',{class:'tf-line'},h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),q.shown):promptNode(q),
+        (deck.example&&q.card.e&&String(q.card.e).trim())?exLine(q.card.e):null,
         h('div',{class:'q-res '+(q.ok?'ok':'bad')},icon(q.ok?'check':'cross'),
           h('div',null,q.ok
             ?h('span',null,'Your answer: ',h('strong',null,yours),q.res==='near'?h('span',null,' (small typo, spelled ',h('strong',null,correct),')'):null)
@@ -2500,7 +2461,7 @@ function tally(){
 }
 function pubItems(){
   const t=tally(),out=[];
-  BUILTIN.forEach(b=>out.push({gid:'bi:'+b[0],builtin:true,mine:false,deck:{title:b[1],desc:b[2],langW:b[3],langD:b[4],choize:b[5],cards:b[6]},up:0,down:0,score:0,at:0}));
+  BUILTIN.forEach(b=>out.push({gid:'bi:'+b[0],builtin:true,mine:false,deck:{title:b[1],desc:b[2],langW:b[3],langD:b[4],choize:b[5],cards:b[6],example:!!b[7]},up:0,down:0,score:0,at:0}));
   Object.keys(PUB).forEach(u=>{
     const decks=PUB[u];
     Object.keys(decks).forEach(k=>{
@@ -2508,7 +2469,7 @@ function pubItems(){
       if(!d||!Array.isArray(d.cards)||typeof d.title!=='string')return;
       const cards=d.cards.filter(c=>Array.isArray(c)&&typeof c[0]==='string'&&typeof c[1]==='string').slice(0,500);
       if(!cards.length)return;
-      const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,
+      const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,example:!!d.example,
         langW:typeof d.langW==='string'?d.langW:'',langD:typeof d.langD==='string'?d.langD:'',at:+d.at||0};
       const gid=u+'~'+k,v=t[gid]||{up:0,down:0};
       out.push({gid,builtin:false,mine:u===UID,key:k,deck:clean,up:v.up,down:v.down,score:v.up-v.down,at:d.at||0});
@@ -2531,7 +2492,7 @@ function publishDeck(d){
   const mine=Object.assign({},myPublished());
   if(!mine[d.id]&&Object.keys(mine).length>=MAX_PUBLISHED)return 'You can have at most '+MAX_PUBLISHED+' public decks. Unpublish one first.';
   if(d.cards.length<MIN_CARDS)return 'A public deck needs at least '+MIN_CARDS+' cards.';
-  mine[d.id]={title:d.title,desc:d.desc||'',cards:d.cards.map(c=>[c.w,c.d]),choize:!!d.choize,langW:d.langW||'',langD:d.langD||'',at:Date.now()};
+  mine[d.id]={title:d.title,desc:d.desc||'',cards:d.cards.map(c=>d.example?[c.w,c.d,c.e||'']:[c.w,c.d]),choize:!!d.choize,example:!!d.example,langW:d.langW||'',langD:d.langD||'',at:Date.now()};
   if(JSON.stringify(mine).length>200000)return 'That deck is too large to publish. Try splitting it into smaller decks.';
   PUB[UID]=mine;
   dbQueue('pub_me',{decks:mine},'pub/'+UID);
@@ -2619,8 +2580,8 @@ function renderAccount(){
   else el.replaceChildren();
 }
 function addCopy(deck,gid){
-  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),
-    cards:deck.cards.map(c=>Array.isArray(c)?{id:uid(),w:c[0],d:c[1]}:{id:uid(),w:c.w,d:c.d})};
+  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),
+    cards:deck.cards.map(c=>Array.isArray(c)?{id:uid(),w:c[0],d:c[1],e:c[2]||''}:{id:uid(),w:c.w,d:c.d,e:c.e||''})};
   // Saving a built-in deck keeps a live link to it instead of a frozen copy, so
   // later edits to the built-in deck show up here too. Community decks are still
   // copied as before.
@@ -2711,7 +2672,7 @@ function pubDeckView(p){
         h('span',{class:'tag'+(it.builtin?' hl':''),style:'justify-self:start'},it.builtin?'Built in':(it.mine?'Yours':'Community')),
         h('h1',null,d.title),
         d.desc?h('p',{class:'desc'},d.desc):null,
-        h('div',{class:'chips'},h('span',{class:'tag'},n+' cards'),h('span',{class:'tag'},'Blanks '+(d.choize?'on':'off'))),
+        h('div',{class:'chips'},h('span',{class:'tag'},n+' cards'),h('span',{class:'tag'},'Blanks '+(d.choize?'on':'off')),d.example?h('span',{class:'tag'},'Example'):null),
         rowBtns,
         it.builtin?h('p',{class:'hint'},'Saved as a link to the built-in deck: if it is edited later, your copy follows.'):null,
         vote,msg,

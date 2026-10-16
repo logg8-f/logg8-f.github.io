@@ -10,7 +10,8 @@
 //
 // Usage:
 //   node deploy/smoke-test.mjs                       # http://localhost:8787
-//   BASE=http://gaderob.tail2714bf.ts.net:8443 node deploy/smoke-test.mjs
+//   BASE=https://gaderob.tail2714bf.ts.net:8443 node deploy/smoke-test.mjs
+//     (the Tailscale door terminates TLS, so it must be https, not http)
 //
 // Exits non-zero if any check fails.
 

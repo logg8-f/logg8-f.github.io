@@ -184,10 +184,17 @@ const clean = s => String(s || '').replace(/^\/+|\/+$/g, '');
 
 /* Ask the model whether the learner's wording means the same as the expected
    answer. Returns true/false, or null on any failure (so the caller falls back). */
-const AI_SYS = 'You are a strict but fair grader for a Swedish vocabulary flashcard app. ' +
-  'Decide if the learner\'s answer is CORRECT: it must mean the same as the accepted ' +
-  'answer, allowing synonyms, paraphrases or a shorter equivalent phrasing, but a ' +
-  'different meaning must be rejected. Reply only as JSON: {"correct": true} or {"correct": false}.';
+const AI_SYS = 'You are a lenient but sensible grader for a Swedish vocabulary flashcard app. ' +
+  'The learner recalls the meaning of a word. Mark the answer CORRECT if it conveys the same ' +
+  'core meaning as the accepted answer: a correct synonym, a paraphrase, a shorter or partial ' +
+  'phrasing that captures the essential sense, or a different grammatical form all count. Mark ' +
+  'it WRONG only if it means something clearly different, is unrelated, or contradicts the ' +
+  'accepted answer. Never require the learner to reproduce every part of a longer definition. ' +
+  'Reply only as JSON: {"correct": true} or {"correct": false}.\n' +
+  'Examples:\n' +
+  '- accepted "tillförlitlig och sakligt trovärdig", learner "trovärdig" -> {"correct": true}\n' +
+  '- accepted "göra något mindre betydelsefullt än det är", learner "förminska" -> {"correct": true}\n' +
+  '- accepted "småaktigt elak eller skamlig", learner "glad" -> {"correct": false}';
 async function gradeWithAI(q, a, u, blank) {
   if (!GROQ_KEY) return null;
   const ac = new AbortController();
@@ -358,7 +365,13 @@ const server = http.createServer(async (req, res) => {
 
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('Not found'); }
-    res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
+    /* Always re-check the page instead of letting the browser guess. Without this
+       a browser may keep an old copy of index.html after an update and run old
+       code (this is what made AI grading look broken after it had gone live). */
+    res.writeHead(200, {
+      'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+      'cache-control': 'no-cache'
+    });
     res.end(req.method === 'HEAD' ? undefined : buf);
   });
 });

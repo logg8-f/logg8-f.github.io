@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Quizlet 2.0 - self-hosted backend
+ * Memoria - self-hosted backend
  * ---------------------------------
  * Serves the app (index.html) AND a tiny shared database, so anyone who opens
  * this server's address can publish decks and vote. By default no sign-in is
@@ -602,7 +602,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log('Quizlet 2.0 server running');
+  console.log('Memoria server running');
   console.log('  On this computer:   http://localhost:' + PORT + '/');
   if (HOST === '0.0.0.0' || HOST === '::') console.log('  On your network:    http://<this-computer-ip>:' + PORT + '/');
   else console.log('  Other devices:      not directly reachable (set HOST=0.0.0.0 to allow, or use Tailscale)');

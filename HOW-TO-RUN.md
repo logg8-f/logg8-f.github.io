@@ -1,4 +1,4 @@
-# Running Quizlet 2.0 on your own computer
+# Running Memoria on your own computer
 
 You have **two** ways to use this folder. They do not conflict.
 
@@ -23,7 +23,7 @@ node server.mjs
 It prints something like:
 
 ```
-Quizlet 2.0 server running
+Memoria server running
   On this computer:   http://localhost:8787/
 ```
 
@@ -235,7 +235,7 @@ Optional settings:
 **Never put the key in the code or commit it to the repository** — it belongs only
 in the environment of the running server.
 
-If Quizlet runs as a systemd service (as it does on the wardrobe computer), set the
+If Memoria runs as a systemd service (as it does on the wardrobe computer), set the
 key on the service instead of the shell. Create `/etc/quizlet.env` containing:
 
 ```

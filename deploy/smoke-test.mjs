@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Smoke test for the Quizlet 2.0 backend.
+// Smoke test for the Memoria backend.
 //
 // Exercises the SAME requests the browser UI makes (index.html): the API probe,
 // publishing a deck, browsing the public collection, voting and the vote tally,

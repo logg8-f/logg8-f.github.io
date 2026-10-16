@@ -1,4 +1,4 @@
-# Using Quizlet 2.0 from outside your home (private, just you)
+# Using Memoria from outside your home (private, just you)
 
 You chose **only you**, so we do **not** open anything to the public internet.
 Instead we use a free tool called **Tailscale** that links your own devices
@@ -46,7 +46,7 @@ sudo tailscale up
 ```
 
 It prints a web link. Open it, create a free Tailscale account (or sign in), and
-approve. That's you signing into *the network*, not into Quizlet — Quizlet
+approve. That's you signing into *the network*, not into Memoria — Memoria
 itself still needs no login.
 
 Check it worked:
@@ -58,7 +58,7 @@ tailscale ip -4
 
 ## Step 3 — Give the app a private web address
 
-Make Tailscale hand out a proper `https://…` address for Quizlet:
+Make Tailscale hand out a proper `https://…` address for Memoria:
 
 ```
 sudo tailscale serve --bg 8787

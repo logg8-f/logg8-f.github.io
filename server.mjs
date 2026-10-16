@@ -214,6 +214,9 @@ function sessionUser(req) {
   const s = sessions[sid];
   if (!s) return null;
   if (s.exp && s.exp < Date.now()) { delete sessions[sid]; saveSessions(); return null; }
+  // A session that predates this feature still marks its account as known, so
+  // the account's own personal area is recognised without signing in again.
+  if (s.sub && !accounts[s.sub]) { accounts[s.sub] = Date.now(); saveAccounts(); }
   return s;
 }
 function sessionCookie(value, maxAgeSec, secure) {

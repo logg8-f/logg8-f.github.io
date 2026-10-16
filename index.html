@@ -55,7 +55,16 @@ button:disabled{cursor:not-allowed}
 .ver{margin-left:12px;font:500 11px/1 var(--f-mono);color:var(--ink-2);opacity:.4;letter-spacing:.03em;user-select:none;cursor:default}
 .acct{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0}
 .acct-name{font:500 12px/1 var(--f-mono);color:var(--ink-2);max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.acct .gsi,.confirm.login .gsi{display:inline-flex;line-height:0;align-items:center}
+.gsi-wrap{position:relative;display:inline-flex;align-items:center;vertical-align:middle}
+.gsi-face{display:inline-flex;align-items:center;gap:9px;height:38px;padding:0 15px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:600 14px/1 var(--f-body);cursor:pointer;white-space:nowrap;transition:border-color .12s,background .12s}
+.gsi-wrap:hover .gsi-face{border-color:var(--ink)}
+.gsi-wrap:focus-within{outline:2.5px solid var(--ink);outline-offset:2px;border-radius:10px}
+.gsi-g{display:inline-flex;flex:none}
+.gsi-g svg{width:18px;height:18px;display:block}
+.gsi-hit{position:absolute;inset:-3px;overflow:hidden;opacity:0}
+.gsi-hit>*{position:absolute;inset:0;width:100%!important;height:100%!important}
+.gsi-hit iframe{width:100%!important;height:100%!important;border:0}
+@media (max-width:560px){.gsi-long{display:none}}
 .logo-c1{fill:var(--surface-2);stroke:var(--ink);stroke-width:2}
 .logo-c2{fill:var(--surface);stroke:var(--ink);stroke-width:2}
 .logo-hl{fill:var(--hl)}
@@ -395,7 +404,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.3';
+const APP_VERSION='2.4';
 
 /* =====================================================================
    Pure helpers
@@ -2512,17 +2521,28 @@ function unpublishDeck(key){
   pubChanged();
 }
 /* ----- Sign in with Google -----
-   Google Identity Services renders the official button and hands us a signed ID
-   token, which the server verifies (signature + audience) before starting a
-   session. The script is only fetched once the server says sign-in is on. */
-let gsiLoading=false,gsiReady=false,gsiBoxes=[];
-function paintGsi(box){
-  if(!box||!box.isConnected||!gsiReady)return;
-  try{google.accounts.id.renderButton(box,{theme:'outline',size:'medium',text:'signin_with',shape:'pill',logo_alignment:'left'});}catch(e){}
+   We draw our own button, styled to match the app, and let the real Google
+   button sit invisibly on top of it: clicking runs Google's sign-in exactly as
+   Google requires, but the user sees our design. Google Identity Services hands
+   us a signed ID token, which the server verifies (signature + audience) before
+   starting a session. The script is only fetched once the server says sign-in is
+   on; pressing our button with the keyboard falls back to Google's One Tap. */
+let gsiLoading=false,gsiReady=false,gsiHits=[];
+const GOOGLE_G='<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>';
+function gsiButton(){
+  const face=h('button',{type:'button',class:'gsi-face','aria-label':'Sign in with Google',
+    onclick:()=>{try{google.accounts.id.prompt();}catch(e){}}},
+    h('span',{class:'gsi-g',html:GOOGLE_G}),
+    h('span',null,'Sign in',h('span',{class:'gsi-long'},' with Google')));
+  const hit=h('span',{class:'gsi-hit','aria-hidden':'true'});
+  const wrap=h('span',{class:'gsi-wrap'},face,hit);
+  gsiHits.push(hit);loadGis();
+  setTimeout(()=>paintGsi(hit),0);   // the box is often not in the DOM yet at this point
+  return wrap;
 }
-function gsiMount(box){
-  gsiBoxes.push(box);loadGis();
-  setTimeout(()=>paintGsi(box),0);   // the box is often not in the DOM yet at this point
+function paintGsi(hit){
+  if(!hit||!hit.isConnected||!gsiReady||hit.firstChild)return;
+  try{google.accounts.id.renderButton(hit,{theme:'outline',size:'large',shape:'rectangular',text:'signin_with',width:240});}catch(e){}
 }
 function loadGis(){
   if(gsiReady||gsiLoading||!AUTH.clientId)return;
@@ -2540,8 +2560,8 @@ function initGis(){
     google.accounts.id.initialize({client_id:AUTH.clientId,callback:onCredential,auto_select:false,cancel_on_tap_outside:true});
     gsiReady=true;
   }catch(e){return;}
-  gsiBoxes=gsiBoxes.filter(b=>b.isConnected);
-  gsiBoxes.forEach(paintGsi);
+  gsiHits=gsiHits.filter(b=>b.isConnected);
+  gsiHits.forEach(paintGsi);
 }
 async function onCredential(resp){
   if(!resp||!resp.credential)return;
@@ -2564,13 +2584,8 @@ function renderAccount(){
       btn('Sign out',{cls:'link',onclick:signOut}));
     return;
   }
-  if(AUTH.on&&AUTH.clientId){
-    const box=h('span',{class:'gsi'});
-    el.replaceChildren(box);
-    gsiMount(box);
-  }else{
-    el.replaceChildren();
-  }
+  if(AUTH.on&&AUTH.clientId)el.replaceChildren(gsiButton());
+  else el.replaceChildren();
 }
 function addCopy(deck,gid){
   const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),
@@ -2589,14 +2604,8 @@ function pubFail(err){
   pubChanged();
 }
 function loginNote(what){
-  const kids=[h('span',null,'Sign in with Google to '+what+'.')];
-  if(AUTH.on&&AUTH.clientId){
-    const box=h('span',{class:'gsi'});
-    kids.push(box);
-    gsiMount(box);
-  }else{
-    kids.push(h('span',{class:'hint'},'Sign-in is not set up on this server.'));
-  }
+  const kids=[h('span',null,'Sign in to '+what+'.')];
+  kids.push((AUTH.on&&AUTH.clientId)?gsiButton():h('span',{class:'hint'},'Sign-in is not set up on this server.'));
   return h('div',{class:'confirm login',role:'status'},...kids);
 }
 const hidden=it=>!it.builtin&&!it.mine&&it.score<=HIDE_AT;

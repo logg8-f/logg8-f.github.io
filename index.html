@@ -72,9 +72,10 @@ button:disabled{cursor:not-allowed}
 .gsi-hit>*{position:absolute;inset:0;width:100%!important;height:100%!important}
 .gsi-hit iframe{width:100%!important;height:100%!important;border:0}
 @media (max-width:560px){.gsi-long{display:none}}
-.logo-c1{fill:var(--surface-2);stroke:var(--ink);stroke-width:2}
-.logo-c2{fill:var(--surface);stroke:var(--ink);stroke-width:2}
-.logo-hl{fill:var(--hl)}
+.logo-bg{fill:#151A3F}
+.logo-c1{fill:#E8EAF5;stroke:#151A3F;stroke-width:2;stroke-linejoin:round}
+.logo-c2{fill:#FFFFFF;stroke:#151A3F;stroke-width:2;stroke-linejoin:round}
+.logo-hl{fill:#FFE45C}
 
 /* buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:10px;border:1.5px solid var(--ink);background:transparent;color:var(--ink);font-weight:600;line-height:1.2;text-decoration:none;transition:transform .12s, background .12s}
@@ -409,7 +410,7 @@ select.in{appearance:auto}
 </style>
 <header class="top"><div class="wrap top-in">
 <button type="button" class="brand" id="brand" aria-label="Memoria, go to the home page">
-<svg viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-c1" x="3" y="9" width="20" height="16" rx="3" transform="rotate(-8 13 17)"/><rect class="logo-c2" x="9" y="7" width="20" height="16" rx="3" transform="rotate(4 19 15)"/><rect class="logo-hl" x="13" y="14" width="12" height="4" rx="1" transform="rotate(4 19 16)"/></svg>
+<svg viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-bg" width="32" height="32" rx="7"/><rect class="logo-c1" x="3" y="9" width="20" height="16" rx="3" transform="rotate(-8 13 17)"/><rect class="logo-c2" x="9" y="7" width="20" height="16" rx="3" transform="rotate(4 19 15)"/><rect class="logo-hl" x="13" y="14" width="12" height="4" rx="1" transform="rotate(4 19 16)"/></svg>
 <span>Memoria</span></button>
 <span class="acct" id="acct"></span>
 <span class="ver" id="ver" title="Memoria"></span>
@@ -422,7 +423,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.9.1';
+const APP_VERSION='2.9.2';
 
 /* =====================================================================
    Pure helpers

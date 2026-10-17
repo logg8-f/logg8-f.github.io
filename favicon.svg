@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Memoria">
+  <rect width="32" height="32" rx="7" fill="#151A3F"/>
+  <g stroke="#151A3F" stroke-width="2" stroke-linejoin="round">
+    <rect x="3" y="9" width="20" height="16" rx="3" transform="rotate(-8 13 17)" fill="#E8EAF5"/>
+    <rect x="9" y="7" width="20" height="16" rx="3" transform="rotate(4 19 15)" fill="#FFFFFF"/>
+  </g>
+  <rect x="13" y="14" width="12" height="4" rx="1" transform="rotate(4 19 16)" fill="#FFE45C"/>
+</svg>

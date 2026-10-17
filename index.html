@@ -304,6 +304,9 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .qp.long{font:500 1.05rem/1.45 var(--f-body)}
 .tf-line{padding:10px 12px;border-radius:10px;background:var(--bg);overflow-wrap:anywhere}
 .tf-line .arrow{color:var(--ink-2);margin-inline:8px}
+.tf-res{display:grid;gap:8px}
+.tf-line.good{border:1.5px solid var(--good);background:var(--good-bg)}
+.tf-line.bad{border:1.5px solid var(--bad);background:var(--bad-bg)}
 .choice.picked{background:var(--hl);color:var(--on-hl);border-color:var(--ink)}
 .choice.picked .kc{border-color:var(--on-hl);color:var(--on-hl);background:transparent}
 .q.sel{border-color:var(--ink);box-shadow:0 0 0 4px var(--mark)}
@@ -412,7 +415,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.7';
+const APP_VERSION='2.8';
 
 /* =====================================================================
    Pure helpers
@@ -1126,7 +1129,7 @@ async function connectDb(){
 /* =====================================================================
    Router (remembers where you were when the page reloads)
    ===================================================================== */
-let view={name:'home'},keyFn=null,leave=[];
+let view={name:'home'},keyFn=null,leave=[],navDepth=0;
 const setKeys=fn=>{keyFn=fn;};
 const onLeave=fn=>{leave.push(fn);};
 document.addEventListener('keydown',e=>{if(keyFn&&!e.metaKey&&!e.ctrlKey&&!e.altKey)keyFn(e);});
@@ -1136,13 +1139,39 @@ function saveView(){
 function loadView(){
   try{return JSON.parse(sessionStorage.getItem(VKEY)||'null');}catch(e){return null;}
 }
-function go(name,params){
+/* Browser history. Every screen we open gets a history entry, so the browser
+   Back button, the mouse back/forward buttons and a phone edge-swipe step
+   through the app instead of dropping the visitor out of the page. navDepth
+   counts the entries we pushed, which tells histBack whether it can pop. */
+function viewState(){return {v:Object.assign({},view),n:navDepth};}
+function histBase(){navDepth=0;try{window.history.replaceState(viewState(),'');}catch(e){}}
+function go(name,params,opts){
+  opts=opts||{};
   leave.forEach(f=>{try{f();}catch(e){}});leave=[];keyFn=null;stopSpeech();navs++;
   view=Object.assign({name},params||{});
   saveView();
+  if(opts.replace)try{window.history.replaceState(viewState(),'');}catch(e){}
+  else if(!opts.quiet){navDepth++;try{window.history.pushState(viewState(),'');}catch(e){navDepth--;}}
   render();
   window.scrollTo(0,0);
 }
+/* In-app Back buttons pop the entry they pushed, so the on-screen Back and the
+   browser/mouse Back stay in step. On the very first screen there is nothing
+   to pop, so we fall back to the named destination. */
+function histBack(name,params){
+  if(navDepth>0){try{window.history.back();return;}catch(e){}}
+  go(name,params);
+}
+window.addEventListener('popstate',e=>{
+  const st=e.state;
+  if(st&&st.v){
+    navDepth=typeof st.n==='number'?st.n:0;
+    go(st.v.name,st.v,{quiet:true});
+  }else{
+    navDepth=0;
+    go('home',{quiet:true});
+  }
+});
 function render(){
   app.replaceChildren();
   const fn=VIEWS[view.name]||VIEWS.home;
@@ -1265,6 +1294,17 @@ const FN=[
     {k:'write',t:'Write',s:'Recall the answer and type it.',i:'write',min:1},
     {k:'test',t:'Test',s:'A mixed test built from this deck.',i:'test',min:2}
 ];
+/* The row of study modes. `open` gets the module key; it is shared by a saved
+   deck and by the preview of a public deck, so a visitor can start studying a
+   shared deck straight away (the deck is copied to their own decks first). */
+function moduleGrid(d,open){
+  const n=d.cards.length;
+  return h('div',{class:'fns'},FN.map(f=>{
+    const off=n<f.min;
+    return h('button',{type:'button',class:'fn',disabled:off,onclick:()=>open(f.k)},
+      h('span',{class:'fn-i'},icon(f.i)),h('h3',null,f.t),h('p',null,off?'Needs at least '+f.min+' cards.':f.s));
+  }));
+}
 function statsPanel(d){
   const st=d.stats;
   const tests=(st&&st.tests)||[];
@@ -1295,7 +1335,7 @@ function deckView(p){
   function askDelete(){
     delBox.replaceChildren(h('div',{class:'confirm',role:'alertdialog'},
       h('span',null,'Delete “'+d.title+'” and its '+n+' cards?'),
-      btn('Delete',{cls:'danger',icon:'trash',onclick:()=>{removeDeck(d.id);go('home');}}),
+      btn('Delete',{cls:'danger',icon:'trash',onclick:()=>{removeDeck(d.id);go('home',{replace:true});}}),
       btn('Keep it',{cls:'ghost',onclick:()=>delBox.replaceChildren()})));
   }
   const pubBox=h('div',{class:'pubbox'});
@@ -1331,7 +1371,7 @@ function deckView(p){
   setPubHook(paintPub);paintPub();
   const rv=reviewItems(d.id);
   const root=h('div',{class:'wrap view'},
-    btn('All decks',{cls:'link',icon:'back',onclick:()=>go('home')}),
+    btn('All decks',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
     h('div',{class:'hub-top'},
       d.example?h('span',{class:'tag',style:'justify-self:start'},'Example'):null,
       h('h1',null,d.title),
@@ -1343,11 +1383,7 @@ function deckView(p){
         pubBtn,
         btn('Delete',{cls:'ghost',icon:'trash',onclick:askDelete})),
       pubBox,delBox),
-    h('div',{class:'fns'},FN.map(f=>{
-      const off=n<f.min;
-      return h('button',{type:'button',class:'fn',disabled:off,onclick:()=>go(f.k,{id:d.id})},
-        h('span',{class:'fn-i'},icon(f.i)),h('h3',null,f.t),h('p',null,off?'Needs at least '+f.min+' cards.':f.s));
-    })),
+    moduleGrid(d,k=>go(k,{id:d.id})),
     rv.length?h('div',{class:'note-row'},
       h('span',null,h('strong',null,rv.length+(rv.length===1?' card':' cards')),' from this deck are in your review list.'),
       btn('Review them',{cls:'hl',icon:'write',onclick:()=>go('write',{id:d.id,review:true})})):null,
@@ -1389,7 +1425,7 @@ function exportView(p){
   build();
   return h('div',{class:'wrap view'},
     h('div',{class:'form'},
-      btn('Back to deck',{cls:'link',icon:'back',onclick:()=>go('deck',{id:deck.id})}),
+      btn('Back to deck',{cls:'link',icon:'back',onclick:()=>histBack('deck',{id:deck.id})}),
       h('h1',null,'Export “'+deck.title+'”'),
       h('div',{class:'field'},h('span',{class:'lbl'},'Separator'),
         seg([[';','; semicolon'],[':',': colon'],['-','- dash'],[',',', comma']],sep,v=>{sep=v;build();},'Separator')),
@@ -1573,7 +1609,7 @@ function editView(p){
 
   function leaveEdit(){
     newImgs.forEach(id=>{delete S.images[id];});
-    if(orig)go('deck',{id:orig.id});else go('home');
+    if(orig)histBack('deck',{id:orig.id});else histBack('home');
   }
   function save(){
     err.textContent='';
@@ -1702,7 +1738,7 @@ function flashView(p){
     TTS?toggle('Read aloud automatically',false,on=>{auto=on;if(on)say();else stopSpeech();}):null);
   show(i0);
   return h('div',{class:'wrap view'},
-    studyBar('Flashcards · '+deck.title,'Back',()=>go('deck',{id:deck.id})),
+    studyBar('Flashcards · '+deck.title,'Back',()=>histBack('deck',{id:deck.id})),
     stage,
     h('div',{class:'fc-nav'},prev,h('div',{class:'cnt-wrap'},cnt,spk),next),
     opts,
@@ -1807,13 +1843,13 @@ function matchView(p){
         h('p',{class:'sub'},
           rec.isBest?(rec.prev===null?'First time on the board. Beat it next round.':'You beat your old best of '+fmt(rec.prev)+'.'):'Your personal best is '+fmt(deck.stats.matchBest)+'.'),
         h('p',{class:'sub'},r.wrongTries===0?'No mistakes. Clean run.':r.wrongTries+(r.wrongTries===1?' mistake':' mistakes')+'. Those cards are now in your review list.'),
-        h('div',{class:'row'},btn('Play again',{cls:'primary',onclick:play}),btn('Back to deck',{cls:'ghost',onclick:()=>go('deck',{id:deck.id})}))));
+        h('div',{class:'row'},btn('Play again',{cls:'primary',onclick:play}),btn('Back to deck',{cls:'ghost',onclick:()=>histBack('deck',{id:deck.id})}))));
     }});
     setKeys(eng.onKey);
   }
   play();
   return h('div',{class:'wrap view'},
-    studyBar('Match · '+deck.title,'Back',()=>go('deck',{id:deck.id})),
+    studyBar('Match · '+deck.title,'Back',()=>histBack('deck',{id:deck.id})),
     box,
     h('p',{class:'center-hint desk-only'},'Press the number on a tile to select it. 0 is the tenth tile.'));
 }
@@ -2044,7 +2080,7 @@ function writeView(p){
     title='Review';
     cards=reviewItems().map(it=>sc(it.deck,it.card));
   }
-  const back=()=>deck?go('deck',{id:deck.id}):go('home');
+  const back=()=>deck?histBack('deck',{id:deck.id}):histBack('home');
   if(!cards.length){
     return h('div',{class:'wrap view'},studyBar(title,'Back',back),
       h('div',{class:'intro'},h('h2',null,'Nothing to review'),h('p',null,'Cards you get wrong stay here until you get them right once.'),btn('Back',{cls:'primary',onclick:back})));
@@ -2194,11 +2230,11 @@ function learnView(p){
       h('p',{class:'sub'},missedN?missedN+(missedN===1?' card needed':' cards needed')+' a second pass. Total time '+fmt(Date.now()-L.t0)+'.':'No misses at all. Total time '+fmt(Date.now()-L.t0)+'.'),
       h('div',{class:'row'},
         btn('Learn again',{cls:'primary',onclick:()=>{clearResume('learn',deck.id);go('learn',{id:deck.id});}}),
-        btn('Back to deck',{cls:'ghost',onclick:()=>go('deck',{id:deck.id})}))));
+        btn('Back to deck',{cls:'ghost',onclick:()=>histBack('deck',{id:deck.id})}))));
   }
 
   const root=h('div',{class:'wrap view'},
-    studyBar('Learn · '+deck.title,'Back',()=>go('deck',{id:deck.id})),
+    studyBar('Learn · '+deck.title,'Back',()=>histBack('deck',{id:deck.id})),
     h('div',{class:'lhead'},
       h('div',{class:'row',style:'justify-content:space-between'},
         h('div',{class:'row',style:'gap:12px;align-items:baseline'},
@@ -2220,7 +2256,7 @@ function learnView(p){
 function testView(p){
   const deck=deckById(p.id);if(!deck)return missing();
   const N=deck.cards.length;
-  const back=()=>go('deck',{id:deck.id});
+  const back=()=>histBack('deck',{id:deck.id});
   const root=h('div',{class:'wrap view'});
   const czAvail=deck.choize&&deck.cards.some(c=>hasBlanks(c.d));
   const cfg={count:Math.min(20,N),types:{tf:N>=2,mc:N>=2,wr:true,cz:czAvail},dir:'mix'};
@@ -2333,18 +2369,18 @@ function testView(p){
         h('div',{class:'q-top'},h('span',null,String(i+1)+' / '+qs.length)));
       if(q.type==='mc'){
         q.buttons=q.options.map((t,n)=>h('button',{type:'button',class:'choice',onclick:()=>choose(i,n)},h('span',{class:'kc'},String(n+1)),h('span',{class:'ct'},t)));
-        art.append(cimg(pimg,'q-img'),promptNode(q),h('p',{class:'ask'},'Choose the '+(q.wd?'definition':'word')),h('div',{class:'choices'},q.buttons));
+        art.append(...[cimg(pimg,'q-img'),promptNode(q),h('p',{class:'ask'},'Choose the '+(q.wd?'definition':'word')),h('div',{class:'choices'},q.buttons)].filter(Boolean));
       }else if(q.type==='tf'){
         q.buttons=['True','False'].map((t,n)=>h('button',{type:'button',class:'choice',onclick:()=>choose(i,n)},h('span',{class:'kc'},String(n+1)),h('span',{class:'ct'},t)));
         art.append(h('p',{class:'ask'},'Do these belong together?'),
-          h('div',{class:'tf-line'},cimg(pimg,'q-img'),h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),q.shown),
+          h('div',{class:'tf-line'},cimg(pimg,'q-img'),h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),rich(q.shown)),
           h('div',{class:'choices'},q.buttons));
       }else{
         q.input=h('input',{class:'in',type:'text',autocomplete:'off',autocapitalize:'off',spellcheck:'false','aria-label':'Answer for question '+(i+1),
           placeholder:q.type==='cz'?'Fill in the blank':'Type the '+(q.wd?'definition':'word'),
           oninput:e=>{q.given=e.target.value;},
           onfocus:()=>{if(sel!==i)select(i,{scroll:false});}});
-        art.append(cimg(pimg,'q-img'),promptNode(q),h('p',{class:'ask'},q.type==='cz'?'Fill in the blank':'Type the '+(q.wd?'definition':'word')),q.input);
+        art.append(...[cimg(pimg,'q-img'),promptNode(q),h('p',{class:'ask'},q.type==='cz'?'Fill in the blank':'Type the '+(q.wd?'definition':'word')),q.input].filter(Boolean));
       }
       arts.push(art);form.append(art);
     });
@@ -2381,6 +2417,14 @@ function testView(p){
     if(q.type==='tf')return q.given===q.isTrue?'exact':'wrong';
     return judge(q.given||'',q.answer).r;
   }
+  /* In the results, a true/false question shows the statement that was on
+     screen and — when that pairing was wrong — the correct word/definition
+     pair too, so the answer key always reveals the real definition. */
+  function tfFacit(q){
+    const line=(cls,other)=>h('div',{class:'tf-line'+(cls?' '+cls:'')},
+      h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),rich(other));
+    return h('div',{class:'tf-res'},line('',q.shown),q.isTrue?null:line('good',q.answer));
+  }
   function showResults(qs){
     setKeys(null);
     qs.forEach(q=>{
@@ -2403,7 +2447,7 @@ function testView(p){
       }
       return h('article',{class:'q '+(q.ok?'ok':'bad')},
         h('div',{class:'q-top'},h('span',null,(i+1)+' · '+TYPE_LABEL[q.type])),
-        q.type==='tf'?h('div',{class:'tf-line'},h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),q.shown):promptNode(q),
+        q.type==='tf'?tfFacit(q):promptNode(q),
         (deck.example&&q.card.e&&String(q.card.e).trim())?exLine(q.card.e):null,
         h('div',{class:'q-res '+(q.ok?'ok':'bad')},icon(q.ok?'check':'cross'),
           h('div',null,q.ok
@@ -2580,7 +2624,7 @@ function renderAccount(){
   else el.replaceChildren();
 }
 function addCopy(deck,gid){
-  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),
+  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),pubGid:gid||'',
     cards:deck.cards.map(c=>Array.isArray(c)?{id:uid(),w:c[0],d:c[1],e:c[2]||''}:{id:uid(),w:c.w,d:c.d,e:c.e||''})};
   // Saving a built-in deck keeps a live link to it instead of a frozen copy, so
   // later edits to the built-in deck show up here too. Community decks are still
@@ -2588,6 +2632,25 @@ function addCopy(deck,gid){
   if(gid&&/^bi:/.test(gid)&&builtinOf(gid)){d.src=gid;hydrateDeck(d);}
   S.decks.push(d);touchDeck(d);
   return d;
+}
+/* --- Public decks, opened like any other deck ---
+   Clicking a deck in Browse goes straight to its study screen, exactly like a
+   deck you already own. We only copy it into "my decks" the moment one of the
+   study modes is actually started, so browsing stays non-committal and the
+   old "Add to my decks, then pick a mode" detour is gone. */
+function ownCopyOf(it){
+  if(it.mine)return deckById(it.key)||null;
+  if(it.builtin)return S.decks.find(d=>d.src===it.gid)||null;
+  return S.decks.find(d=>d.pubGid===it.gid)||null;
+}
+function ensureCopy(it){
+  const own=ownCopyOf(it);
+  return own||addCopy(it.deck,it.gid);
+}
+function openPublic(it){
+  const own=ownCopyOf(it);
+  if(own)go('deck',{id:own.id});
+  else go('pubdeck',{id:it.gid});
 }
 const loginOk=()=>!(AUTH.on&&!UID);
 const canShare=()=>!!DB&&loginOk();
@@ -2603,7 +2666,7 @@ function loginNote(what){
 const hidden=it=>!it.builtin&&!it.mine&&it.score<=HIDE_AT;
 
 function pubTile(it){
-  return h('button',{type:'button',class:'deck',onclick:()=>go('pubdeck',{id:it.gid})},
+  return h('button',{type:'button',class:'deck',onclick:()=>openPublic(it)},
     h('span',{class:'tag'+(it.builtin?' hl':'')},it.builtin?'Built in':(it.mine?'Yours':'Community')),
     h('h3',null,it.deck.title),
     it.deck.desc?h('p',null,it.deck.desc):null,
@@ -2640,9 +2703,9 @@ function browseView(){
   setPubHook(paint);
   paint();
   return h('div',{class:'wrap view'},
-    btn('Home',{cls:'link',icon:'back',onclick:()=>go('home')}),
+    btn('Home',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
     h('div',{class:'intro',style:'justify-items:start;text-align:left;padding:6px 0 18px'},h('h1',null,'Browse public decks'),
-      h('p',{class:'sub'},'Built-in decks and decks shared by other people. Add any of them to your own decks to study or edit.')),
+      h('p',{class:'sub'},'Built-in decks and decks shared by other people. Open any of them to study right away: it is added to your own decks when you begin.')),
     h('div',{class:'toolbar'},search),
     h('div',{class:'row',style:'margin:12px 0'},catSeg,sortSeg),
     info,list);
@@ -2652,11 +2715,12 @@ function pubDeckView(p){
   function paint(){
     const it=pubFind(p.id);
     if(!it){
-      if(pubReady){setTimeout(()=>go('browse'),0);return;}
-      root.replaceChildren(btn('Back',{cls:'link',icon:'back',onclick:()=>go('browse')}),h('p',{class:'sub',style:'margin-top:16px'},'Loading…'));
+      if(pubReady){setTimeout(()=>histBack('browse'),0);return;}
+      root.replaceChildren(btn('Back',{cls:'link',icon:'back',onclick:()=>histBack('browse')}),h('p',{class:'sub',style:'margin-top:16px'},'Loading…'));
       return;
     }
     const d=it.deck,n=d.cards.length;
+    const own=ownCopyOf(it);
     const canVote=canShare()&&!it.builtin&&!it.mine;
     const mv=myVote(it.gid);
     const msg=h('p',{class:'hint','aria-live':'polite'});
@@ -2664,23 +2728,27 @@ function pubDeckView(p){
       h('button',{type:'button',class:'vbtn','aria-pressed':String(mv===1),disabled:!canVote,title:canVote?'Like':'Voting needs the shared database',onclick:()=>castVote(it.gid,1)},icon('up'),h('span',null,String(it.up))),
       h('button',{type:'button',class:'vbtn','aria-pressed':String(mv===-1),disabled:!canVote,title:canVote?'Dislike':'Voting needs the shared database',onclick:()=>castVote(it.gid,-1)},icon('down'),h('span',null,String(it.down))));
     const rowBtns=h('div',{class:'row'},
-      btn('Add to my decks',{cls:'primary',icon:'plus',onclick:()=>{const nd=addCopy(d,it.gid);go('deck',{id:nd.id});}}),
-      it.mine?btn('Unpublish',{cls:'ghost',icon:'trash',onclick:()=>{unpublishDeck(it.key);go('browse');}}):null);
-    root.replaceChildren(
-      btn('Browse public decks',{cls:'link',icon:'back',onclick:()=>go('browse')}),
+      btn(own?'Open my copy':'Add to my decks',{cls:'ghost',icon:own?'next':'plus',onclick:()=>go('deck',{id:ensureCopy(it).id})}),
+      (it.mine&&own)?btn('Edit deck',{cls:'ghost',icon:'edit',onclick:()=>go('edit',{id:own.id})}):null,
+      it.mine?btn('Unpublish',{cls:'ghost',icon:'trash',onclick:()=>{unpublishDeck(it.key);histBack('browse');}}):null);
+    root.replaceChildren(...[
+      btn('Browse public decks',{cls:'link',icon:'back',onclick:()=>histBack('browse')}),
       h('div',{class:'hub-top'},
         h('span',{class:'tag'+(it.builtin?' hl':''),style:'justify-self:start'},it.builtin?'Built in':(it.mine?'Yours':'Community')),
         h('h1',null,d.title),
         d.desc?h('p',{class:'desc'},d.desc):null,
         h('div',{class:'chips'},h('span',{class:'tag'},n+' cards'),h('span',{class:'tag'},'Blanks '+(d.choize?'on':'off')),d.example?h('span',{class:'tag'},'Example'):null),
         rowBtns,
-        it.builtin?h('p',{class:'hint'},'Saved as a link to the built-in deck: if it is edited later, your copy follows.'):null,
+        h('p',{class:'hint'},it.builtin?'Studying a built-in deck saves a link to it: if it is edited later, your copy follows.':'Pick a study mode to start. The deck is added to your own decks when you begin.'),
         vote,msg,
         (!it.builtin&&!canVote&&!it.mine)?(DB?loginNote('vote'):h('p',{class:'hint'},'Voting needs the shared server, which this page cannot reach right now.')):null,
         pubNotice?h('p',{class:'hint warnline'},pubNotice):null),
-      h('div',{class:'cl cl-open'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
-        d.cards.slice(0,200).map(c=>[h('div',null,rich(c[0])),h('div',null,rich(c[1]))])),
-      n>200?h('p',{class:'hint'},'Showing the first 200 of '+n+' cards.'):null);
+      moduleGrid(d,k=>go(k,{id:ensureCopy(it).id})),
+      h('details',{class:'cards-list'},
+        h('summary',null,'Cards in this deck ('+n+')'),
+        h('div',{class:'cl'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
+          d.cards.slice(0,200).map(c=>[h('div',null,rich(c[0])),h('div',null,rich(c[1]))]))),
+      n>200?h('p',{class:'hint'},'Showing the first 200 of '+n+' cards.'):null].filter(Boolean));
   }
   setPubHook(paint);
   paint();
@@ -2708,6 +2776,7 @@ document.getElementById('brand').addEventListener('click',()=>go('home'));
   const verEl=document.getElementById('ver');
   if(verEl){verEl.textContent='v'+APP_VERSION;verEl.title='Memoria '+APP_VERSION;}
   render();
+  histBase();
   connectDb();
 })();
 

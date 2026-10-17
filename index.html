@@ -53,8 +53,15 @@ button:disabled{cursor:not-allowed}
 .brand svg{width:32px;height:32px;flex:none}
 .brand b{font:500 13px/1 var(--f-mono);background:var(--hl);color:var(--on-hl);padding:4px 6px;border-radius:5px;transform:rotate(-3deg);letter-spacing:0}
 .ver{margin-left:12px;font:500 11px/1 var(--f-mono);color:var(--ink-2);opacity:.4;letter-spacing:.03em;user-select:none;cursor:default}
-.acct{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0}
-.acct-name{font:500 12px/1 var(--f-mono);color:var(--ink-2);max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0;position:relative}
+.acct-btn{display:inline-flex;align-items:center;gap:8px;min-width:0;padding:3px 10px 3px 3px;border:1.5px solid transparent;border-radius:999px;background:transparent;color:var(--ink);font:600 14px/1 var(--f-body);cursor:pointer;transition:border-color .12s,background .12s}
+.acct-btn:hover{border-color:var(--line);background:var(--surface)}
+.acct-nm{max-width:32vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-av{position:relative;width:30px;height:30px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font:700 12px/1 var(--f-display);color:var(--ink-2);overflow:hidden;flex:none;user-select:none}
+.acct-pic{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.acct-pop{position:absolute;right:0;top:calc(100% + 10px);z-index:7;width:min(300px,86vw);display:none;flex-direction:column;gap:10px;padding:14px;border-radius:14px;background:var(--surface);border:1.5px solid var(--line);box-shadow:var(--shadow)}
+.acct.open .acct-pop{display:flex}
+.acct-pop .lbl{font:500 12px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
 .gsi-wrap{position:relative;display:inline-flex;align-items:center;vertical-align:middle}
 .gsi-face{display:inline-flex;align-items:center;gap:9px;height:38px;padding:0 15px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:600 14px/1 var(--f-body);cursor:pointer;white-space:nowrap;transition:border-color .12s,background .12s}
 .gsi-wrap:hover .gsi-face{border-color:var(--ink)}
@@ -415,7 +422,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.8';
+const APP_VERSION='2.9';
 
 /* =====================================================================
    Pure helpers
@@ -717,7 +724,7 @@ function shrink(file){
    Data + storage
    ===================================================================== */
 const KEY='quizlet2.v1',VKEY='quizlet2.view',DKEY='quizlet2.draft';
-let S={decks:[],review:[],images:{},resume:null,seeded:true,linked:false};
+let S={decks:[],review:[],images:{},resume:null,profile:{name:''},seeded:true,linked:false};
 let dirty=false,localLoaded=false,col=null,navs=0,pending=null;
 let DB=null,ME=null,PUB={},VOTES={},pubReady=false,pubHook=null,pubNotice='';
 /* Google sign-in. The server decides whether it is on (it holds the OAuth client
@@ -822,7 +829,7 @@ async function dbFlush(id){
     if(e.tries<=6){clearTimeout(e.timer);e.timer=setTimeout(()=>dbFlush(id),Math.min(15000,800*e.tries));}
   }
 }
-const metaDoc=()=>({review:clone(S.review),resume:S.resume?clone(S.resume):null,seeded:true,linked:!!S.linked});
+const metaDoc=()=>({review:clone(S.review),resume:S.resume?clone(S.resume):null,profile:S.profile?clone(S.profile):{name:''},seeded:true,linked:!!S.linked});
 function touchDeck(d){dirty=true;lsSave();dbQueue('d_'+d.id,clone(d));}
 function touchMeta(){dirty=true;lsSave();dbQueue('meta',metaDoc());}
 function usedImages(){
@@ -1062,6 +1069,9 @@ function applyPersonal(remote,mode){
     if(remote&&remote.meta){
       if(!S.resume&&remote.meta.resume)S.resume=remote.meta.resume;
       if(remote.meta.linked)S.linked=true;
+      /* A display name set on another device follows the account; a name set on
+         this device wins on the first merge so it is not silently overwritten. */
+      if(remote.meta.profile&&remote.meta.profile.name&&!(S.profile&&S.profile.name))S.profile=clone(remote.meta.profile);
     }
     if(remote){
       const have=new Set(S.decks.map(d=>d.id));
@@ -1076,6 +1086,7 @@ function applyPersonal(remote,mode){
     S.review=(remote.meta&&Array.isArray(remote.meta.review))?remote.meta.review:[];
     S.images=remote.images;
     S.resume=(remote.meta&&remote.meta.resume)||null;
+    S.profile=(remote.meta&&remote.meta.profile)||{name:''};
     if(remote.meta&&remote.meta.linked)S.linked=true;
   }
 }
@@ -2611,18 +2622,69 @@ async function signOut(){
   /* Reload so the personal area goes back to this browser's own decks. */
   try{location.reload();}catch(e){}
 }
+function acctName(){
+  const custom=(S.profile&&S.profile.name)?String(S.profile.name).trim():'';
+  return custom||USER.name||USER.email||'Signed in';
+}
+function acctAvatar(name){
+  const av=h('span',{class:'acct-av','aria-hidden':'true'},String((name||'?').trim().charAt(0)||'?').toUpperCase());
+  if(USER.picture){
+    const img=h('img',{class:'acct-pic',src:USER.picture,alt:'',referrerpolicy:'no-referrer'});
+    img.addEventListener('error',()=>img.remove());   // fall back to the initial
+    av.append(img);
+  }
+  return av;
+}
+function saveAcctName(value){
+  S.profile=Object.assign({},S.profile,{name:String(value||'').trim().slice(0,40)});
+  touchMeta();
+  renderAccount();
+}
 function renderAccount(){
   const el=document.getElementById('acct');
   if(!el)return;
-  if(USER){
-    el.replaceChildren(
-      h('span',{class:'acct-name',title:(USER.email||'')+' — signed in'},USER.name||USER.email||'Signed in'),
-      btn('Sign out',{cls:'link',onclick:signOut}));
+  if(!USER){
+    if(AUTH.on&&AUTH.clientId)el.replaceChildren(gsiButton());
+    else el.replaceChildren();
     return;
   }
-  if(AUTH.on&&AUTH.clientId)el.replaceChildren(gsiButton());
-  else el.replaceChildren();
+  const name=acctName();
+  const input=h('input',{id:'acct-name',class:'in',type:'text',maxlength:'40',autocomplete:'nickname',
+    placeholder:USER.name||USER.email||'Your display name',
+    value:(S.profile&&S.profile.name)||'',
+    onkeydown:e=>{if(e.key==='Enter'){e.preventDefault();saveAcctName(e.target.value);}}});
+  const pop=h('div',{class:'acct-pop',role:'dialog','aria-label':'Account'},
+    h('span',{class:'lbl'},'Display name'),
+    input,
+    h('div',{class:'row'},
+      btn('Save',{cls:'primary',onclick:()=>saveAcctName(input.value)}),
+      (S.profile&&S.profile.name)?btn('Use Google name',{cls:'ghost',onclick:()=>saveAcctName('')}):null),
+    h('p',{class:'hint'},'Shown in the top corner on every device signed in to this account.'),
+    h('div',{class:'row'},btn('Sign out',{cls:'link',onclick:signOut})));
+  const toggle=h('button',{type:'button',class:'acct-btn','aria-haspopup':'dialog','aria-expanded':'false',title:'Account settings',onclick:()=>{
+    const open=el.classList.toggle('open');
+    toggle.setAttribute('aria-expanded',String(open));
+    if(open){const i=el.querySelector('#acct-name');if(i){i.focus();if(i.select)i.select();}}
+  }},acctAvatar(name),h('span',{class:'acct-nm'},name));
+  el.replaceChildren(toggle,pop);
 }
+/* The account menu lives in the header, outside the view router, so closing it
+   on an outside click or Escape is handled once, globally. */
+document.addEventListener('click',e=>{
+  const a=document.getElementById('acct');
+  if(a&&a.classList.contains('open')&&!a.contains(e.target)){
+    a.classList.remove('open');
+    const b=a.querySelector('.acct-btn');if(b)b.setAttribute('aria-expanded','false');
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  const a=document.getElementById('acct');
+  if(a&&a.classList.contains('open')){
+    a.classList.remove('open');
+    const b=a.querySelector('.acct-btn');if(b){b.setAttribute('aria-expanded','false');b.focus();}
+  }
+});
 function addCopy(deck,gid){
   const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),pubGid:gid||'',
     cards:deck.cards.map(c=>Array.isArray(c)?{id:uid(),w:c[0],d:c[1],e:c[2]||''}:{id:uid(),w:c.w,d:c.d,e:c.e||''})};
@@ -2763,8 +2825,8 @@ document.getElementById('brand').addEventListener('click',()=>go('home'));
 
 (function boot(){
   const loc=lsLoad();
-  if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],images:loc.images||{},resume:loc.resume||null,seeded:true,linked:!!loc.linked};localLoaded=true;}
-  else S={decks:[],review:[],images:{},resume:null,seeded:true,linked:false};
+  if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],images:loc.images||{},resume:loc.resume||null,profile:(loc.profile&&typeof loc.profile.name==='string')?{name:loc.profile.name}:{name:''},seeded:true,linked:!!loc.linked};localLoaded=true;}
+  else S={decks:[],review:[],images:{},resume:null,profile:{name:''},seeded:true,linked:false};
   hydrateAll();
   if(!S.linked){if(linkBuiltinCopies())hydrateAll();S.linked=true;}
   pruneReview(true);

@@ -423,6 +423,7 @@ select.in{appearance:auto}
 .choice.locked:hover .kc{border-color:var(--line);color:var(--ink-2);background:var(--bg)}
 .warnline{color:var(--bad)}
 .confirm.login{background:var(--surface-2);border-color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:30;display:flex;align-items:flex-start;gap:12px;width:min(460px,92vw);padding:13px 14px 13px 16px;border-radius:14px;border:1.5px solid var(--ink);background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-size:14px;line-height:1.45}
 
 /* deck settings dialog */
 .modal-back{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:18px;background:rgba(21,26,63,.45)}
@@ -449,7 +450,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.11.0';
+const APP_VERSION='2.11.1';
 
 /* =====================================================================
    Pure helpers
@@ -660,12 +661,27 @@ function toggle(label,on,onChange,o){
 
 /* ----- read aloud (Web Speech API) ----- */
 const TTS=(function(){try{return 'speechSynthesis' in window&&'SpeechSynthesisUtterance' in window;}catch(e){return false;}})();
+/* Some browsers (notably Chrome/Firefox on Linux) expose the API but have no
+   speech engine installed, so every utterance would be silent. Fill the voice
+   list as soon as the browser offers it, and say so once if it stays empty. */
+let ttsWarned=false;
+function ttsVoices(){try{return speechSynthesis.getVoices()||[];}catch(e){return [];}}
+if(TTS){try{ttsVoices();speechSynthesis.onvoiceschanged=()=>{ttsVoices();};}catch(e){}}
+function noVoicesNote(){
+  if(ttsWarned)return;
+  ttsWarned=true;
+  const el=h('div',{class:'toast',role:'status'},
+    h('span',null,'No speech voices were found on this device, so Read aloud stays silent. On Linux, install a speech engine such as speech-dispatcher and espeak-ng.'),
+    h('button',{type:'button',class:'icon-btn','aria-label':'Dismiss','title':'Dismiss',onclick:()=>el.remove()},icon('x')));
+  document.body.append(el);
+  setTimeout(()=>{try{el.remove();}catch(e){}},15000);
+}
 const LANGS=[['','Auto (device default)'],['sv-SE','Svenska'],['en-US','English (US)'],['en-GB','English (UK)'],['es-ES','Español'],['fr-FR','Français'],['de-DE','Deutsch'],['it-IT','Italiano'],['pt-PT','Português'],['nb-NO','Norsk'],['da-DK','Dansk'],['fi-FI','Suomi'],['nl-NL','Nederlands'],['pl-PL','Polski'],['ru-RU','Русский'],['ja-JP','日本語'],['zh-CN','中文']];
 const BAD_VOICES=/\b(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|hysterical|junior|organ|princess|ralph|superstar|trinoids|whisper|wobble|zarvox|fred|kathy)\b/i;
 const GOOD_VOICES=/google|natural|neural|online|premium|enhanced|siri|samantha|karen|daniel|moira|alex|serena|ava|allison|zira|aria|jenny|hazel|susan|oskar|alva|klara|astrid|emma|amy|sofia|lekha/i;
 function voiceFor(lang){
   try{
-    const all=speechSynthesis.getVoices();
+    const all=ttsVoices();
     if(!all.length||!lang)return null;
     const want=lang.toLowerCase();
     let c=all.filter(v=>v.lang&&v.lang.replace('_','-').toLowerCase()===want);
@@ -680,6 +696,7 @@ let speakTok=0;
 /* segs: [{t,lang}] spoken in order, {gap:ms} is silence */
 function speakSeq(segs){
   if(!TTS)return;
+  if(!ttsVoices().length){noVoicesNote();return;}
   const tok=++speakTok;
   try{speechSynthesis.cancel();}catch(e){}
   let i=0;

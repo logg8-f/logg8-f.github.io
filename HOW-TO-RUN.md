@@ -211,14 +211,16 @@ browser (`data/users/<browser-id>/`), signed in they belong to the account
 (`data/users/<account-id>/`), which is what lets them follow you between
 devices. Copying the `data/` folder is therefore a full backup of the app.
 
-## Optional: AI grading of typed answers
+## Optional: AI grading and hints
 
-In the **Write** practice mode you normally have to type an answer close to the
-stored one (small spelling slips are already forgiven). If you want the app to also
-accept *paraphrases* — saying the same thing in different words — you can switch on
-optional AI grading. It is **off by default**, costs nothing unless you add a key,
-and if the key is missing or the service is unreachable the app simply falls back to
-the normal matching, so studying never breaks.
+In **Write** and **Test** you normally have to type an answer close to the stored
+one (small spelling slips are already forgiven). If you want the app to also
+accept *paraphrases* — saying the same thing in different words — you can switch
+on optional AI grading. In **Write** the same key also adds an **AI hint** button
+that describes the meaning without giving the answer away. It is **off by
+default**, costs nothing unless you add a key, and if the key is missing or the
+service is unreachable the app simply falls back to the normal matching (and the
+letter hint), so studying never breaks.
 
 To turn it on, give the server a free Groq API key (get one at
 https://console.groq.com):

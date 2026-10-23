@@ -118,10 +118,12 @@ button:disabled{cursor:not-allowed}
 .decks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:14px}
 .deck{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:150px;width:100%;padding:18px;text-align:left;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:16px;transition:border-color .12s, transform .12s}
 .deck:hover{border-color:var(--ink);transform:translateY(-2px)}
-.deck.c-colored{border-top:5px solid var(--dc);padding-top:15px}
+.deck.c-colored{background:color-mix(in srgb,var(--dc) 13%,var(--surface));border-color:color-mix(in srgb,var(--dc) 55%,var(--line))}
+.deck.c-colored:hover{border-color:var(--dc)}
 .deck h3{font-size:1.2rem;line-height:1.2;overflow-wrap:anywhere}
 .deck p{color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
-.deck .meta{margin-top:auto;font:500 12px var(--f-mono);color:var(--ink-2)}
+.deck .meta{margin-top:auto;font:500 12px var(--f-mono);color:var(--ink-2);display:flex;align-items:center}
+.deck-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--dc);margin-right:7px;flex:none}
 .deck.new{border-style:dashed;align-items:center;justify-content:center;gap:6px;background:transparent;color:var(--ink-2);font-weight:600}
 .deck.new .i svg{width:1.8em;height:1.8em}
 .tag{display:inline-block;font:500 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);color:var(--ink-2);padding:2px 7px;border-radius:999px}
@@ -165,6 +167,11 @@ details.cards-list summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .field{display:grid;gap:7px}
 .field>label,.lbl{font-weight:600;font-size:14px}
 .in{width:100%;padding:11px 13px;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:10px;font:inherit;line-height:1.4}
+.in-wrap{position:relative;display:block}
+.in-wrap .in{padding-right:44px}
+.in-img{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--ink-2);display:grid;place-items:center;padding:0}
+.in-img:hover{background:var(--surface-2);color:var(--ink)}
+.in-img .i svg{width:1.15em;height:1.15em}
 .in:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px var(--mark)}
 .in::placeholder{color:var(--ink-2);opacity:.7}
 textarea.in{resize:vertical;min-height:44px}
@@ -187,17 +194,21 @@ textarea.in{resize:vertical;min-height:44px}
 .tg{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 0;font-weight:500}
 .soon{font:500 10px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--ink-2);padding:1px 6px;border-radius:999px;margin-left:8px;font-style:normal}
 .slots{display:grid;gap:18px}
-.slot{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1.6fr) auto;grid-template-areas:"n w d a";gap:10px;align-items:start}
-.slot-n{grid-area:n;font:500 13px var(--f-mono);color:var(--ink-2);text-align:center}
-.slot .cw{grid-area:w}.slot .cd{grid-area:d}.slot-a{grid-area:a;display:flex;gap:2px}
-.slots.has-ex .slot{grid-template-areas:"n w d a" "n e e a"}
+.slot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) auto;grid-template-areas:"w d a";gap:14px;align-items:start;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.slot:last-child{border-bottom:0;padding-bottom:0}
+.slot-n{font:500 13px var(--f-mono);color:var(--ink-2)}
+.slot .cw{grid-area:w}.slot .cd{grid-area:d}.slot-a{grid-area:a;display:flex;gap:2px;padding-top:20px}
+.slots.has-ex .slot{grid-template-areas:"w d a" "e e a"}
 .slot .ce{grid-area:e}
 .ce .cell-lbl{color:var(--ink)}
-.exnote{margin-left:auto;font:500 11px var(--f-mono);color:var(--ink-2)}
+.exnote{font:500 11px var(--f-mono);color:var(--ink-2)}
+.cell-top{display:flex;align-items:baseline;gap:8px}
+.cell-top .slot-n{margin-right:auto}
+.cell-top .exnote{margin-right:auto;margin-left:0}
 @media (max-width:640px){
-  .slot{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"n w a" "n d a";gap:6px 8px;padding-bottom:10px;border-bottom:1px dashed var(--line)}
-  .slots.has-ex .slot{grid-template-areas:"n w a" "n d a" "n e a";padding-bottom:14px}
-  .slot-a{flex-direction:column}
+  .slot{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"w a" "d a";gap:12px 8px;padding-bottom:16px}
+  .slots.has-ex .slot{grid-template-areas:"w a" "d a" "e a";padding-bottom:18px}
+  .slot-a{flex-direction:column;padding-top:20px}
 }
 .add-card{justify-self:start}
 .bulk{display:grid;gap:10px;padding:0 16px 16px}
@@ -438,7 +449,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.10.0';
+const APP_VERSION='2.11.0';
 
 /* =====================================================================
    Pure helpers
@@ -1059,6 +1070,17 @@ async function aiGrade(q,a,u,blank){
     return j&&j.ok?(j.correct===true):null;
   }catch(e){return null;}
 }
+/* A short AI nudge about the meaning of the answer, or null when unavailable. */
+async function aiHint(q,a){
+  try{
+    const r=await fetch(API_BASE+'hint',{method:'POST',cache:'no-store',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({q,a})});
+    if(!r.ok)return null;
+    const j=await r.json();
+    return j&&j.ok?String(j.hint||''):null;
+  }catch(e){return null;}
+}
 
 /* ----- the personal area -----
    When signed out it is this browser's own decks (keyed by the anonymous id);
@@ -1252,33 +1274,58 @@ function previewNode(s){
 
 const DECK_COLORS=['','#FFE45C','#7ED7A6','#7FA8F8','#F9A26C','#C89BF7','#F27C8D'];
 const safeColor=s=>/^#[0-9a-f]{6}$/i.test(String(s||''))?String(s):'';
+/* A row of colour swatches shared by deck settings and the deck editor. */
+function colorSwatches(value,onPick){
+  const btns=[];
+  const box=h('div',{class:'swatches',role:'group','aria-label':'Deck colour'});
+  DECK_COLORS.forEach(c=>{
+    const b=h('button',{type:'button',class:'swatch',style:c?('background:'+c):null,
+      'aria-label':c?'Use this colour':'No colour','aria-pressed':String(c===value),
+      onclick:()=>{btns.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));onPick(c);}},
+      c?null:icon('x'));
+    btns.push(b);box.append(b);
+  });
+  return box;
+}
+/* Long-press (touch) = secondary click. The capture-phase click handler stops
+   the tap that follows the long press from also opening the deck. */
+function longPress(el,fn){
+  let t=null,sx=0,sy=0,fired=false;
+  const clear=()=>{if(t){clearTimeout(t);t=null;}};
+  el.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse')return;
+    fired=false;sx=e.clientX;sy=e.clientY;clear();
+    t=setTimeout(()=>{t=null;fired=true;try{fn();}catch(err){}},550);
+  });
+  el.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-sx)>10||Math.abs(e.clientY-sy)>10)clear();});
+  el.addEventListener('pointerup',clear);
+  el.addEventListener('pointercancel',clear);
+  el.addEventListener('click',e=>{if(fired){fired=false;e.preventDefault();e.stopPropagation();}},true);
+}
 function deckTile(d){
   const dc=safeColor(d.color);
-  return h('button',{type:'button',class:'deck'+(dc?' c-colored':''),style:dc?('--dc:'+dc):null,
+  const el=h('button',{type:'button',class:'deck'+(dc?' c-colored':''),style:dc?('--dc:'+dc):null,
     onclick:()=>go('deck',{id:d.id}),
     oncontextmenu:e=>{e.preventDefault();openDeckSettings(d);}},
     d.example?h('span',{class:'tag'},'Example'):null,
     h('h3',null,d.title),
     d.desc?h('p',null,d.desc):null,
-    h('span',{class:'meta'},d.cards.length+(d.cards.length===1?' card':' cards')));
+    h('span',{class:'meta'},dc?h('span',{class:'deck-dot','aria-hidden':'true'}):null,
+      d.cards.length+(d.cards.length===1?' card':' cards')));
+  longPress(el,()=>openDeckSettings(d));
+  return el;
 }
-/* Deck settings: right-click a deck on the home page (or its hub heading).
-   Style is a colour strip on the deck card; title and description can be
-   changed here too, and the deck can be deleted without opening the editor. */
+/* Deck settings: right-click a deck on the home page (or its hub heading), or
+   long-press it on a touch screen. The colour tints the deck card; title and
+   description can be changed here too, and the deck can be deleted without
+   opening the editor. */
 function openDeckSettings(d){
+  if(document.querySelector('.modal-back'))return;
   let color=safeColor(d.color),askDelete=false;
   const title=h('input',{class:'in',type:'text',maxlength:'80',value:d.title,'aria-label':'Deck title'});
   const desc=h('textarea',{class:'in',rows:'2',maxlength:'240','aria-label':'Deck description'},d.desc||'');
   const err=h('p',{class:'err',role:'alert'});
-  const swatches=[];
-  const sw=h('div',{class:'swatches',role:'group','aria-label':'Deck colour'});
-  DECK_COLORS.forEach(c=>{
-    const b=h('button',{type:'button',class:'swatch',style:c?('background:'+c):null,
-      'aria-label':c?'Use this colour':'No colour','aria-pressed':String(c===color),
-      onclick:()=>{color=c;swatches.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));}},
-      c?null:icon('x'));
-    swatches.push(b);sw.append(b);
-  });
+  const sw=colorSwatches(color,c=>{color=c;});
   const actions=h('div',{class:'form-actions'});
   const extra=h('div');
   const modal=h('div',{class:'modal',role:'dialog','aria-modal':'true','aria-label':'Deck settings'},
@@ -1323,10 +1370,8 @@ function openDeckSettings(d){
   title.select();
 }
 function homeView(){
-  const totalCards=S.decks.reduce((n,d)=>n+d.cards.length,0);
   const hero=h('section',{class:'hero'},
     h('div',{class:'hero-copy'},
-      h('p',{class:'eyebrow'},S.decks.length+(S.decks.length===1?' deck':' decks')+' · '+totalCards+(totalCards===1?' card':' cards')),
       h('h1',null,'Welcome to ',h('span',{class:'mark'},'Memoria'),'.'),
       h('p',{class:'lead'},'To get started, create a deck of words and definitions. Then study it with flashcards, match, write, learn and test.'),
       h('div',{class:'row'},
@@ -1539,9 +1584,9 @@ function editView(p){
   const blank=()=>({id:uid(),w:'',d:'',e:''});
   let saved=null;
   if(p.restore){try{const o=JSON.parse(sessionStorage.getItem(DKEY)||'null');if(o&&o.forId===(p.id||null))saved=o.draft;}catch(e){}}
-  const draft=saved||(orig?clone(orig):{id:uid(),title:'',desc:'',choize:true,example:false,langW:'',langD:'',cards:[blank()],created:Date.now()});
+  const draft=saved||(orig?clone(orig):{id:uid(),title:'',desc:'',choize:true,example:false,color:'',langW:'',langD:'',cards:[blank()],created:Date.now()});
   if(!draft.cards||!draft.cards.length)draft.cards=[blank()];
-  draft.langW=draft.langW||'';draft.langD=draft.langD||'';
+  draft.langW=draft.langW||'';draft.langD=draft.langD||'';draft.color=safeColor(draft.color);
   const newImgs=new Set();
   if(saved){const used=usedImages();draft.cards.forEach(c=>['wi','di'].forEach(k=>{if(c[k]&&!used.has(c[k]))newImgs.add(c[k]);}));}
   let lastField=null,saveT=null;
@@ -1595,7 +1640,7 @@ function editView(p){
       c[key]=id;err.textContent='';persist();renderSlots();
     }catch(e){err.textContent='Could not read that image. Try a PNG or JPEG.';}
   }
-  function cell(c,side,i){
+  function cell(c,side,i,number){
     const imgKey=side==='w'?'wi':'di';
     const pv=h('div',{class:'preview'});
     const upd=()=>{
@@ -1623,16 +1668,16 @@ function editView(p){
     const file=h('input',{type:'file',accept:'image/*',class:'sr-only',tabindex:'-1','aria-hidden':'true',onchange:e=>{attach(c,imgKey,e.target.files[0]);}});
     const fbtn=(label,tip,l,r,cls)=>h('button',{type:'button',class:'fmt '+(cls||''),title:tip,'aria-label':tip,onclick:()=>wrapSel(inp,l,r)},label);
     const has=c[imgKey]&&S.images[c[imgKey]];
+    const img=k=>h('button',{type:'button',class:'in-img',title:'Add an image (you can also paste one)','aria-label':'Add an image to '+(side==='w'?'word ':'definition ')+(i+1),onclick:()=>k.click()},icon('image'));
     return h('div',{class:'cell c'+side},
-      h('span',{class:'cell-lbl'},side==='w'?'Word':'Definition'),
-      inp,
+      h('div',{class:'cell-top'},
+        number?h('span',{class:'slot-n'},String(number)):null,
+        h('span',{class:'cell-lbl'},side==='w'?'Word':'Definition')),
+      h('div',{class:'in-wrap'},inp,img(file)),
       has?h('span',{class:'thumb'},h('img',{src:S.images[c[imgKey]],alt:''}),
         h('button',{type:'button',class:'icon-btn sm',title:'Remove image','aria-label':'Remove image',onclick:()=>{c[imgKey]=null;persist();renderSlots();}},icon('x'))):null,
-      pv,
-      h('div',{class:'cell-t'},
-        (side==='d'&&draft.choize)?h('span',{class:'fmt-group'},fbtn('Blank','Hide the selected word when you practise (Fill in the blank)','{','}','blankbtn')):null,
-        h('button',{type:'button',class:'fmt imgb',title:'Add an image (you can also paste one)','aria-label':'Add an image to '+(side==='w'?'word ':'definition ')+(i+1),onclick:()=>file.click()},icon('image'),'Image'),
-        file));
+      pv,file,
+      (side==='d'&&draft.choize)?h('div',{class:'cell-t'},h('span',{class:'fmt-group'},fbtn('Blank','Hide the selected word when you practise (Fill in the blank)','{','}','blankbtn'))):null);
   }
   function exCell(c,i){
     const pv=h('div',{class:'preview'});
@@ -1651,10 +1696,8 @@ function editView(p){
       }});
     upd();
     return h('div',{class:'cell ce'},
-      h('span',{class:'cell-lbl'},'Example'),
-      inp,
-      pv,
-      h('div',{class:'cell-t'},h('span',{class:'exnote'},'Shown after the answer')));
+      h('div',{class:'cell-top'},h('span',{class:'exnote'},'Shown after the answer'),h('span',{class:'cell-lbl'},'Example')),
+      inp,pv);
   }
   function renderSlots(focusId){
     lastField=null;
@@ -1671,7 +1714,7 @@ function editView(p){
   }
   function slot(c,i){
     return h('div',{class:'slot'},
-      h('span',{class:'slot-n'},String(i+1)),cell(c,'w',i),cell(c,'d',i),draft.example?exCell(c,i):null,
+      cell(c,'w',i,i+1),cell(c,'d',i),draft.example?exCell(c,i):null,
       h('div',{class:'slot-a'},
         h('button',{type:'button',class:'icon-btn',title:'Remove this card','aria-label':'Remove card '+(i+1),onclick:()=>removeAt(i)},icon('trash'))));
   }
@@ -1716,7 +1759,7 @@ function editView(p){
     }
     if(!out.length){err.textContent='Add at least one card with a word and a definition.';return;}
     let target;
-    const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,example:!!draft.example,langW:draft.langW,langD:draft.langD,cards:out};
+    const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,example:!!draft.example,color:safeColor(draft.color),langW:draft.langW,langD:draft.langD,cards:out};
     if(orig){Object.assign(orig,fields);if(orig.src){delete orig.src;orig.noLink=true;}target=orig;}
     else{target=Object.assign({id:draft.id,created:draft.created},fields);S.decks.push(target);}
     touchDeck(target);syncImages(Array.from(newImgs));pruneReview(false);
@@ -1730,6 +1773,9 @@ function editView(p){
       orig&&orig.src?h('p',{class:'hint'},'This deck is linked to the built-in deck. Saving your edits makes it your own copy, and it stops following the built-in version.'):null,
       h('div',{class:'field'},h('label',{for:'f-title'},'Title'),title),
       h('div',{class:'field'},h('label',{for:'f-desc'},'Description'),desc),
+      h('div',{class:'field'},h('span',{class:'lbl'},'Colour'),
+        colorSwatches(draft.color,v=>{draft.color=v;persist();}),
+        h('p',{class:'hint'},'Tints the deck card on the home and browse pages.')),
       h('div',{class:'setting'},
         h('div',{class:'setting-l'},
           h('div',{class:'row',style:'gap:4px'},h('strong',{id:'choize-l'},'Fill in the blank'),info),
@@ -2013,6 +2059,7 @@ function writeEngine(box,cards,o){
           if(e.key==='Enter'){e.preventDefault();check(inp.value);}
         }});
       const mask=h('div',{class:'hint-mask','aria-live':'polite'});
+      const aiLine=h('p',{class:'hint ai-hint','aria-live':'polite'});
       const hintBtn=btn('Hint',{cls:'ghost',icon:'bulb',onclick:()=>{
         cur.hints++;
         mask.textContent=maskHint(answer,cur.hints);
@@ -2020,13 +2067,32 @@ function writeEngine(box,cards,o){
         if(cur.hints>=letterCount(answer))hintBtn.disabled=true;
         inp.focus();
       }});
+      const aiBtn=AI?btn('AI hint',{cls:'ghost',icon:'bulb',onclick:async()=>{
+        if(fb||aiBtn.disabled)return;
+        const mine=cur;
+        aiBtn.disabled=true;
+        aiLine.textContent='Thinking of a hint…';
+        const h=await aiHint(plain(mine.wd?mine.c.w:mine.c.d),answer);
+        if(dead||fb||cur!==mine)return;
+        if(h){
+          aiLine.textContent='Hint: '+h;
+          mine.hints++;
+          hintBtn.lastChild.textContent='Hint ('+mine.hints+')';
+          if(mine.hints>=letterCount(answer))hintBtn.disabled=true;
+        }else{
+          aiLine.textContent='No AI hint right now — use the letter hint instead.';
+          aiBtn.disabled=false;
+        }
+        try{inp.focus();}catch(e){}
+      }}):null;
       const actions=h('div',{class:'row'},
         btn('Check',{cls:'primary',onclick:()=>check(inp.value)}),
         hintBtn,
+        aiBtn,
         btn('Don’t know',{cls:'ghost',onclick:()=>check('')}));
       actions.querySelectorAll('button').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());});
       cur.inp=inp;cur.actions=actions;
-      area.append(h('p',{class:'ask'},mode==='cloze'?'Fill in the blank':'Type the '+(wd?'definition':'word')),mask,inp,actions);
+      area.append(h('p',{class:'ask'},mode==='cloze'?'Fill in the blank':'Type the '+(wd?'definition':'word')),mask,aiLine,inp,actions);
       try{inp.focus();}catch(e){}
       setTimeout(()=>{if(!dead&&!fb&&document.activeElement!==inp)inp.focus();},0);
     }
@@ -2359,22 +2425,19 @@ function testView(p){
   let alive=true;
   onLeave(()=>{alive=false;});
   const czAvail=deck.choize&&deck.cards.some(c=>hasBlanks(c.d));
-  const cfg={count:Math.min(20,N),types:{tf:N>=2,mc:N>=2,wr:true,cz:czAvail},dir:'mix'};
+  const cfg={count:N,types:{tf:N>=2,mc:N>=2,wr:true,cz:czAvail},dir:'mix'};
   const TYPE_LABEL={tf:'True / false',mc:'Multiple choice',wr:'Written',cz:'Fill in the blank'};
   const isDesk=!!(window.matchMedia&&window.matchMedia('(hover:hover) and (pointer:fine)').matches);
 
   function showConfig(){
     setKeys(null);
     const err=h('p',{class:'err',role:'alert'});
-    const count=h('input',{id:'t-count',class:'in',type:'number',min:'1',max:'200',value:String(cfg.count),
-      oninput:e=>{const v=parseInt(e.target.value,10);if(v>=1)cfg.count=Math.min(200,v);}});
     const tests=(deck.stats&&deck.stats.tests)||[];
     root.replaceChildren(studyBar('Test · '+deck.title,'Back',back),
       h('div',{class:'cfg'},
         h('h1',null,'Set up your test'),
         tests.length?h('p',{class:'sub'},'Last result '+tests[tests.length-1].right+' / '+tests[tests.length-1].total+' · best '+Math.max.apply(null,tests.map(t=>Math.round(t.right/t.total*100)))+'%'):null,
-        h('div',{class:'field'},h('label',{for:'t-count'},'Number of questions'),count,
-          h('p',{class:'hint'},'Your deck has '+N+' cards. Ask for more and the same word comes back later in the test, spaced out.')),
+        h('p',{class:'sub'},N+' questions, one for every card in the deck.'),
         h('div',{class:'field'},h('span',{class:'lbl'},'Question types'),
           h('div',{class:'setting',style:'display:grid;gap:4px'},
             ['tf','mc','wr'].map(k=>{
@@ -2389,7 +2452,6 @@ function testView(p){
           btn('Start test',{cls:'primary',icon:'test',onclick:()=>{
             const types=['tf','mc','wr','cz'].filter(k=>cfg.types[k]);
             if(!types.length){err.textContent='Pick at least one question type.';return;}
-            cfg.count=Math.max(1,Math.min(200,parseInt(count.value,10)||cfg.count));
             showTest(buildTest(types));
           }}),
           btn('Cancel',{cls:'ghost',onclick:back}))));
@@ -2895,11 +2957,12 @@ function loginNote(what){
 const hidden=it=>!it.builtin&&!it.mine&&it.score<=HIDE_AT;
 
 function pubTile(it){
-  return h('button',{type:'button',class:'deck'+(it.deck.color?' c-colored':''),style:it.deck.color?('--dc:'+it.deck.color):null,onclick:()=>openPublic(it)},
+  const dc=safeColor(it.deck.color);
+  return h('button',{type:'button',class:'deck'+(dc?' c-colored':''),style:dc?('--dc:'+dc):null,onclick:()=>openPublic(it)},
     h('span',{class:'tag'+(it.builtin?' hl':'')},it.builtin?'Built in':(it.mine?'Yours':'Community')),
     h('h3',null,it.deck.title),
     it.deck.desc?h('p',null,it.deck.desc):null,
-    h('span',{class:'meta'},it.deck.cards.length+' cards'+(it.builtin?'':' · '+(it.score>0?'+':'')+it.score)));
+    h('span',{class:'meta'},dc?h('span',{class:'deck-dot','aria-hidden':'true'}):null,it.deck.cards.length+' cards'+(it.builtin?'':' · '+(it.score>0?'+':'')+it.score)));
 }
 function browseView(){
   let q='',cat='all',sort='top';

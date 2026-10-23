@@ -397,6 +397,48 @@ async function gradeWithAI(q, a, u, blank) {
   finally { clearTimeout(to); }
 }
 
+/* One short nudge towards a card's answer. Must not contain the answer itself;
+   returns null on failure or when the model leaks the answer, so the page can
+   fall back to its letter mask. */
+const HINT_SYS = 'You give one short hint for a vocabulary flashcard. The learner must recall the ' +
+  'accepted answer. Describe its meaning, a typical context or a related idea in ONE plain sentence ' +
+  'of at most 14 words, in the same language as the accepted answer. Never write the accepted answer, ' +
+  'an inflected form of it, or its distinctive words. Do not ask a question and do not use quotation ' +
+  'marks. If the answer is a single word, hint at its category, use or opposite rather than its ' +
+  'spelling. Reply with the hint only.';
+async function hintWithAI(q, a) {
+  if (!GROQ_KEY) return null;
+  const ac = new AbortController();
+  const to = setTimeout(() => ac.abort(), 9000);
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + GROQ_KEY },
+      body: JSON.stringify({
+        model: GROQ_MODEL, temperature: 0.5, max_tokens: 80, reasoning_effort: 'low',
+        messages: [
+          { role: 'system', content: HINT_SYS },
+          { role: 'user', content: 'Card prompt: ' + q + '\nAccepted answer: ' + a }
+        ]
+      }),
+      signal: ac.signal
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const msg = (j && j.choices && j.choices[0] && j.choices[0].message) || {};
+    let t = String(msg.content || '').trim().replace(/^["“']+|["”']+$/g, '').replace(/\s+/g, ' ');
+    if (t.length > 180) t = t.slice(0, 180).replace(/\s+\S*$/, '') + '…';
+    if (t.length < 4) return null;
+    const norm = s => String(s).toLowerCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim();
+    const hint = norm(t), ans = norm(a);
+    if (ans && hint.includes(ans)) return null;                    // leaked the answer
+    const words = ans.split(' ').filter(w => w.length > 3);
+    if (words.length && words.every(w => hint.includes(w))) return null; // leaked every key word
+    return t;
+  } catch { return null; }
+  finally { clearTimeout(to); }
+}
+
 /* ---------- rules for what may be published ---------- */
 const MAX_PUB_CHARS = 1800000;
 function checkPub(data) {
@@ -505,6 +547,21 @@ const server = http.createServer(async (req, res) => {
       const verdict = await gradeWithAI(q, a, u, (body && body.t) === 'blank');
       if (verdict === null) return json(res, 200, { ok: false, reason: 'unavailable' });
       return json(res, 200, { ok: true, correct: verdict });
+    }
+
+    // one semantic hint for a card: POST /api/hint {q,a}
+    if (kind === 'hint' && req.method === 'POST') {
+      if (!GROQ_KEY) return json(res, 200, { ok: false, reason: 'off' });
+      if (aiTooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+      let body;
+      try { body = JSON.parse(await readBody(req)); }
+      catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
+      const q = String((body && body.q) || '').slice(0, 200).trim();
+      const a = String((body && body.a) || '').slice(0, 400).trim();
+      if (!a) return json(res, 200, { ok: false, reason: 'empty' });
+      const hint = await hintWithAI(q, a);
+      if (!hint) return json(res, 200, { ok: false, reason: 'unavailable' });
+      return json(res, 200, { ok: true, hint });
     }
 
     // list the immediate children of a collection: /api/col/<prefix...>

@@ -453,7 +453,10 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.13.0';
+const APP_VERSION='2.14.0';
+/* Bump this to make every browser drop its cached decks once, on the next
+   visit. Used together with a server-side wipe so old copies cannot come back. */
+const DATA_RESET='2026-10-24-clean-1';
 
 /* =====================================================================
    Pure helpers
@@ -3112,6 +3115,20 @@ const VIEWS={home:homeView,deck:deckView,edit:editView,export:exportView,flash:f
 document.getElementById('brand').addEventListener('click',()=>go('home'));
 
 (function boot(){
+  /* One-off clean start: a reset token makes this browser throw away decks,
+     review history and images cached in localStorage. The profile name stays.
+     This runs before the first lsLoad(), so no stale deck is rendered or
+     merged back into the freshly wiped server area. */
+  try{
+    const RKEY='quizlet2.reset';
+    if(localStorage.getItem(RKEY)!==DATA_RESET){
+      const old=lsLoad();
+      const profile=(old&&old.profile&&typeof old.profile.name==='string')?{name:old.profile.name}:{name:''};
+      localStorage.setItem(KEY,JSON.stringify({decks:[],review:[],images:{},resume:null,profile,seeded:true,linked:!!(old&&old.linked)}));
+      try{sessionStorage.removeItem(VKEY);sessionStorage.removeItem(DKEY);}catch(e){}
+      localStorage.setItem(RKEY,DATA_RESET);
+    }
+  }catch(e){}
   const loc=lsLoad();
   if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],images:loc.images||{},resume:loc.resume||null,profile:(loc.profile&&typeof loc.profile.name==='string')?{name:loc.profile.name}:{name:''},seeded:true,linked:!!loc.linked};localLoaded=true;}
   else S={decks:[],review:[],images:{},resume:null,profile:{name:''},seeded:true,linked:false};

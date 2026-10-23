@@ -453,7 +453,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.14.0';
+const APP_VERSION='2.15.0';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -465,6 +465,21 @@ const uid=()=>Date.now().toString(36).slice(-4)+Math.random().toString(36).slice
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function chunk(a,n){const r=[];for(let i=0;i<a.length;i+=n)r.push(a.slice(i,i+n));return r;}
 function norm(s){return String(s==null?'':s).normalize('NFC').toLowerCase().replace(/[\s ]+/g,' ').replace(/[.!?;,]+$/,'').trim();}
+/* Accent-insensitive form for typed answers and search. NFD splits an accented
+   letter into its base plus a combining mark; dropping the marks makes “São
+   Tomé” accept “Sao Tome”, “España” accept “Espana”, and so on. Letters that do
+   not decompose are folded explicitly, and apostrophes/hyphens become spaces so
+   “Côte d'Ivoire” also accepts “Cote d Ivoire”. */
+const FOLD_LETTERS={'ø':'o','æ':'ae','œ':'oe','ß':'ss','ł':'l','đ':'d','ð':'d','þ':'th','ı':'i','ħ':'h','ŋ':'n','ŧ':'t'};
+function loose(s){
+  let t=String(s==null?'':s).normalize('NFC').toLowerCase();
+  t=t.replace(/[’‘`´ʼ]/g,"'").replace(/['\-‐‑–—]/g,' ');
+  /* Only strip marks after Latin letters: й and и are different letters in
+     Cyrillic, while é and e are the same letter with and without an accent. */
+  t=t.normalize('NFD').replace(/(\p{Script=Latin})(\p{M}+)/gu,'$1');
+  t=t.replace(/[øæœßłđðþıħŋŧ]/g,ch=>FOLD_LETTERS[ch]);
+  return t.replace(/\s+/g,' ').replace(/[.!?;,]+$/,'').trim();
+}
 function clone(o){return JSON.parse(JSON.stringify(o));}
 function fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function lenClass(t){return t.length>90?'xl':t.length>40?'long':'';}
@@ -545,7 +560,7 @@ function sectionSizes(n){
 function pairsPerRound(n){return n<=5?n:(n<=8?Math.ceil(n/2):5);}
 function variants(ans){
   const out=new Set();
-  const add=s=>{const n=norm(s);if(n)out.add(n);};
+  const add=s=>{const n=loose(s);if(n)out.add(n);};
   const strip=s=>s.replace(/\([^)]*\)/g,' ');
   ans=plain(ans);
   add(ans);add(strip(ans));
@@ -553,7 +568,7 @@ function variants(ans){
   return Array.from(out);
 }
 function isRight(given,answer){
-  const g=norm(given);
+  const g=loose(given);
   if(!g)return false;
   return variants(answer).indexOf(g)!==-1;
 }
@@ -572,7 +587,7 @@ function lev(a,b){
   return d[m][n];
 }
 function judge(given,answer){
-  const g=norm(given);
+  const g=loose(given);
   if(!g)return{r:'wrong'};
   const vs=variants(answer);
   if(vs.indexOf(g)!==-1)return{r:'exact'};
@@ -3034,9 +3049,9 @@ function browseView(){
   const catSeg=seg([['all','All'],['builtin','Built in'],['community','Community'],['mine','Yours']],cat,v=>{cat=v;paint();},'Show');
   const sortSeg=seg([['top','Top rated'],['popular','Popular']],sort,v=>{sort=v;paint();},'Sort community decks');
   function match(it){
-    const toks=norm(q).split(' ').filter(Boolean);
+    const toks=loose(q).split(' ').filter(Boolean);
     if(!toks.length)return true;
-    const hay=norm(it.deck.title+' '+(it.deck.desc||'')+' '+it.deck.cards.map(c=>plain(c[0]||'')+' '+plain(c[1]||'')).join(' '));
+    const hay=loose(it.deck.title+' '+(it.deck.desc||'')+' '+it.deck.cards.map(c=>plain(c[0]||'')+' '+plain(c[1]||'')).join(' '));
     return toks.every(t=>hay.indexOf(t)>=0);
   }
   function paint(){

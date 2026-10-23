@@ -88,6 +88,9 @@ button:disabled{cursor:not-allowed}
 .btn.link{border-color:transparent;padding-inline:8px;color:var(--ink-2)}
 .btn.link:hover:not(:disabled){color:var(--ink)}
 .btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn.browse-cta{padding:15px 24px;font-size:1.05rem;background:var(--hl);color:var(--on-hl);border-color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.btn.browse-cta:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--ink)}
+.btn.browse-cta .i svg{width:1.45em;height:1.45em}
 .btn:disabled{opacity:.45}
 .icon-btn{width:38px;height:38px;display:inline-grid;place-items:center;border:0;border-radius:9px;background:transparent;color:var(--ink-2)}
 .icon-btn:hover{background:var(--surface-2);color:var(--ink)}
@@ -115,6 +118,7 @@ button:disabled{cursor:not-allowed}
 .decks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:14px}
 .deck{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:150px;width:100%;padding:18px;text-align:left;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:16px;transition:border-color .12s, transform .12s}
 .deck:hover{border-color:var(--ink);transform:translateY(-2px)}
+.deck.c-colored{border-top:5px solid var(--dc);padding-top:15px}
 .deck h3{font-size:1.2rem;line-height:1.2;overflow-wrap:anywhere}
 .deck p{color:var(--ink-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .deck .meta{margin-top:auto;font:500 12px var(--f-mono);color:var(--ink-2)}
@@ -182,7 +186,7 @@ textarea.in{resize:vertical;min-height:44px}
 .switch:disabled{opacity:.5}
 .tg{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:6px 0;font-weight:500}
 .soon{font:500 10px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--ink-2);padding:1px 6px;border-radius:999px;margin-left:8px;font-style:normal}
-.slots{display:grid;gap:10px}
+.slots{display:grid;gap:18px}
 .slot{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1.6fr) auto;grid-template-areas:"n w d a";gap:10px;align-items:start}
 .slot-n{grid-area:n;font:500 13px var(--f-mono);color:var(--ink-2);text-align:center}
 .slot .cw{grid-area:w}.slot .cd{grid-area:d}.slot-a{grid-area:a;display:flex;gap:2px}
@@ -236,6 +240,7 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 @keyframes slideR{from{transform:translateX(26px)}to{transform:none}}
 @keyframes slideL{from{transform:translateX(-26px)}to{transform:none}}
 .fc-nav{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:22px}
+.fc:focus,.fc:focus-visible{outline:none}
 .count{font:500 15px var(--f-mono);min-width:70px;text-align:center}
 
 /* match */
@@ -407,6 +412,16 @@ select.in{appearance:auto}
 .choice.locked:hover .kc{border-color:var(--line);color:var(--ink-2);background:var(--bg)}
 .warnline{color:var(--bad)}
 .confirm.login{background:var(--surface-2);border-color:var(--ink)}
+
+/* deck settings dialog */
+.modal-back{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:18px;background:rgba(21,26,63,.45)}
+.modal{width:min(440px,100%);max-height:88vh;overflow:auto;display:grid;gap:16px;padding:20px;border-radius:18px;border:1.5px solid var(--ink);background:var(--surface);box-shadow:var(--shadow)}
+.modal h2{font-size:1.4rem}
+.modal .sec-h{margin:0}
+.swatches{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.swatch{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);display:grid;place-items:center;color:var(--ink-2);padding:0}
+.swatch:hover{border-color:var(--ink)}
+.swatch[aria-pressed="true"]{border-color:var(--ink);box-shadow:0 0 0 3px var(--mark)}
 </style>
 <header class="top"><div class="wrap top-in">
 <button type="button" class="brand" id="brand" aria-label="Memoria, go to the home page">
@@ -423,7 +438,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.9.2';
+const APP_VERSION='2.10.0';
 
 /* =====================================================================
    Pure helpers
@@ -698,6 +713,11 @@ function speakBtn(getSegs,cls){
 /* ----- card images ----- */
 function cimg(id,cls){
   const src=id&&S.images&&S.images[id];
+  return src?h('img',{class:cls||'cimg',src,alt:''}):null;
+}
+/* Image from a public deck's own image map (not yet copied into S.images). */
+function pubCimg(deck,id,cls){
+  const src=id&&deck&&deck.images&&deck.images[id];
   return src?h('img',{class:cls||'cimg',src,alt:''}):null;
 }
 function shrink(file){
@@ -1230,12 +1250,77 @@ function previewNode(s){
    ===================================================================== */
 
 
+const DECK_COLORS=['','#FFE45C','#7ED7A6','#7FA8F8','#F9A26C','#C89BF7','#F27C8D'];
+const safeColor=s=>/^#[0-9a-f]{6}$/i.test(String(s||''))?String(s):'';
 function deckTile(d){
-  return h('button',{type:'button',class:'deck',onclick:()=>go('deck',{id:d.id})},
+  const dc=safeColor(d.color);
+  return h('button',{type:'button',class:'deck'+(dc?' c-colored':''),style:dc?('--dc:'+dc):null,
+    onclick:()=>go('deck',{id:d.id}),
+    oncontextmenu:e=>{e.preventDefault();openDeckSettings(d);}},
     d.example?h('span',{class:'tag'},'Example'):null,
     h('h3',null,d.title),
     d.desc?h('p',null,d.desc):null,
     h('span',{class:'meta'},d.cards.length+(d.cards.length===1?' card':' cards')));
+}
+/* Deck settings: right-click a deck on the home page (or its hub heading).
+   Style is a colour strip on the deck card; title and description can be
+   changed here too, and the deck can be deleted without opening the editor. */
+function openDeckSettings(d){
+  let color=safeColor(d.color),askDelete=false;
+  const title=h('input',{class:'in',type:'text',maxlength:'80',value:d.title,'aria-label':'Deck title'});
+  const desc=h('textarea',{class:'in',rows:'2',maxlength:'240','aria-label':'Deck description'},d.desc||'');
+  const err=h('p',{class:'err',role:'alert'});
+  const swatches=[];
+  const sw=h('div',{class:'swatches',role:'group','aria-label':'Deck colour'});
+  DECK_COLORS.forEach(c=>{
+    const b=h('button',{type:'button',class:'swatch',style:c?('background:'+c):null,
+      'aria-label':c?'Use this colour':'No colour','aria-pressed':String(c===color),
+      onclick:()=>{color=c;swatches.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));}},
+      c?null:icon('x'));
+    swatches.push(b);sw.append(b);
+  });
+  const actions=h('div',{class:'form-actions'});
+  const extra=h('div');
+  const modal=h('div',{class:'modal',role:'dialog','aria-modal':'true','aria-label':'Deck settings'},
+    h('div',{class:'sec-h'},h('h2',null,'Deck settings'),
+      h('button',{type:'button',class:'icon-btn','aria-label':'Close','title':'Close',onclick:()=>close()},icon('x'))),
+    h('div',{class:'field'},h('label',null,'Title'),title),
+    h('div',{class:'field'},h('label',null,'Description'),desc),
+    h('div',{class:'field'},h('span',{class:'lbl'},'Colour'),sw),
+    err,extra,actions);
+  const back=h('div',{class:'modal-back'},modal);
+  function close(){
+    back.remove();
+    document.removeEventListener('keydown',onKey);
+  }
+  function onKey(e){if(e.key==='Escape')close();}
+  function paintActions(){
+    actions.replaceChildren(
+      btn('Save',{cls:'primary',icon:'check',onclick:()=>save()}),
+      btn('Cancel',{cls:'ghost',onclick:()=>close()}));
+    extra.replaceChildren(...(askDelete?[
+      h('div',{class:'confirm',role:'alertdialog'},
+        h('span',null,'Delete “'+(d.title||'this deck')+'” and its '+d.cards.length+' cards?'),
+        btn('Delete',{cls:'danger',icon:'trash',onclick:()=>{
+          const wasHere=view.name==='deck'&&view.id===d.id;
+          removeDeck(d.id);close();
+          if(wasHere)go('home',{replace:true});else render();
+        }}),
+        btn('Keep it',{cls:'ghost',onclick:()=>{askDelete=false;paintActions();}}))
+    ]:[btn('Delete deck',{cls:'danger',icon:'trash',onclick:()=>{askDelete=true;paintActions();}})]));
+  }
+  function save(){
+    const t=title.value.trim();
+    if(!t){err.textContent='Give the deck a title.';title.focus();return;}
+    d.title=t;d.desc=desc.value.trim();d.color=color;
+    touchDeck(d);close();render();
+  }
+  paintActions();
+  back.addEventListener('click',e=>{if(e.target===back)close();});
+  document.addEventListener('keydown',onKey);
+  document.body.append(back);
+  title.focus();
+  title.select();
 }
 function homeView(){
   const totalCards=S.decks.reduce((n,d)=>n+d.cards.length,0);
@@ -1245,8 +1330,7 @@ function homeView(){
       h('h1',null,'Welcome to ',h('span',{class:'mark'},'Memoria'),'.'),
       h('p',{class:'lead'},'To get started, create a deck of words and definitions. Then study it with flashcards, match, write, learn and test.'),
       h('div',{class:'row'},
-        btn('Create a deck',{cls:'primary',icon:'plus',onclick:()=>go('edit')}),
-        btn('Browse public decks',{cls:'ghost',icon:'globe',onclick:()=>go('browse')}))));
+        btn('Browse public decks',{cls:'browse-cta',icon:'globe',onclick:()=>go('browse')}))));
 
   pruneReview(false);
   const items=reviewItems();
@@ -1366,9 +1450,10 @@ function deckView(p){
     }
     if(pubAsk){
       kids.push(h('div',{class:'confirm',role:'alertdialog'},
-        h('span',null,'Publish “'+d.title+'” so anyone who opens this page can copy it and vote on it? Images are left out. Decks with many dislikes get hidden.'),
-        btn(isPub?'Update':'Publish',{cls:'primary',icon:'globe',onclick:()=>{
-          const err=publishDeck(d);pubAsk=false;
+        h('span',null,'Publish “'+d.title+'” so anyone who opens this page can copy it and vote on it? Images are included (shrunk to keep the deck small). Decks with many dislikes get hidden.'),
+        btn(isPub?'Update':'Publish',{cls:'primary',icon:'globe',onclick:async()=>{
+          pubMsg='Publishing…';paintPub();
+          const err=await publishDeck(d);pubAsk=false;
           pubMsg=err||'Published. Find it under Browse public decks.';paintPub();
         }}),
         btn('Cancel',{cls:'ghost',onclick:()=>{pubAsk=false;paintPub();}})));
@@ -1384,7 +1469,7 @@ function deckView(p){
   const rv=reviewItems(d.id);
   const root=h('div',{class:'wrap view'},
     btn('All decks',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
-    h('div',{class:'hub-top'},
+    h('div',{class:'hub-top',oncontextmenu:e=>{e.preventDefault();openDeckSettings(d);}},
       d.example?h('span',{class:'tag',style:'justify-self:start'},'Example'):null,
       h('h1',null,d.title),
       d.desc?h('p',{class:'desc'},d.desc):null,
@@ -1479,7 +1564,7 @@ function editView(p){
     const o=info.classList.toggle('open');infoBtn.setAttribute('aria-expanded',String(o));
   }},icon('info'));
   const info=h('span',{class:'info'},infoBtn,h('span',{class:'tip',role:'tooltip'},
-    'Fill in the blank turns words in {curly brackets} into blanks. Write “Paris; {Huvudstaden} av {Frankrike}” and Write asks “Paris = ____ av Frankrike” or “Paris = Huvudstaden av ____”.'));
+    'Fill in the blank turns words in {curly brackets} into blanks. Write “Paris; {the capital} of {France}” and Write asks “Paris = ____ of France” or “Paris = the capital of ____”.'));
   const closeInfo=e=>{if(!info.contains(e.target)){info.classList.remove('open');infoBtn.setAttribute('aria-expanded','false');}};
   document.addEventListener('click',closeInfo);
   onLeave(()=>document.removeEventListener('click',closeInfo));
@@ -1527,7 +1612,6 @@ function editView(p){
         }
       },
       onkeydown:e=>{
-        if((e.ctrlKey||e.metaKey)&&(e.key==='b'||e.key==='i')){e.preventDefault();const m=e.key==='b'?'**':'*';wrapSel(inp,m,m);return;}
         if(e.key!=='Enter')return;
         e.preventDefault();
         if(side==='w'){document.getElementById('d-'+c.id).focus();return;}
@@ -1546,10 +1630,7 @@ function editView(p){
         h('button',{type:'button',class:'icon-btn sm',title:'Remove image','aria-label':'Remove image',onclick:()=>{c[imgKey]=null;persist();renderSlots();}},icon('x'))):null,
       pv,
       h('div',{class:'cell-t'},
-        h('span',{class:'fmt-group'},
-          fbtn('B','Make the selected text bold','**','**','b'),
-          fbtn('I','Make the selected text italic','*','*','it'),
-          (side==='d'&&draft.choize)?fbtn('Blank','Hide the selected word when you practise (Fill in the blank)','{','}','blankbtn'):null),
+        (side==='d'&&draft.choize)?h('span',{class:'fmt-group'},fbtn('Blank','Hide the selected word when you practise (Fill in the blank)','{','}','blankbtn')):null,
         h('button',{type:'button',class:'fmt imgb',title:'Add an image (you can also paste one)','aria-label':'Add an image to '+(side==='w'?'word ':'definition ')+(i+1),onclick:()=>file.click()},icon('image'),'Image'),
         file));
   }
@@ -1563,21 +1644,17 @@ function editView(p){
       oninput:e=>{c.e=e.target.value;upd();persist();},
       onfocus:()=>{lastField=inp;},
       onkeydown:e=>{
-        if((e.ctrlKey||e.metaKey)&&(e.key==='b'||e.key==='i')){e.preventDefault();const m=e.key==='b'?'**':'*';wrapSel(inp,m,m);return;}
         if(e.key!=='Enter')return;
         e.preventDefault();
         const nx=draft.cards[i+1];
         if(nx)document.getElementById('w-'+nx.id).focus();else addAfter(i);
       }});
     upd();
-    const fbtn=(label,tip,l,r,cls)=>h('button',{type:'button',class:'fmt '+(cls||''),title:tip,'aria-label':tip,onclick:()=>wrapSel(inp,l,r)},label);
     return h('div',{class:'cell ce'},
       h('span',{class:'cell-lbl'},'Example'),
       inp,
       pv,
-      h('div',{class:'cell-t'},
-        h('span',{class:'fmt-group'},fbtn('B','Make the selected text bold','**','**','b'),fbtn('I','Make the selected text italic','*','*','it')),
-        h('span',{class:'exnote'},'Shown after the answer')));
+      h('div',{class:'cell-t'},h('span',{class:'exnote'},'Shown after the answer')));
   }
   function renderSlots(focusId){
     lastField=null;
@@ -1599,20 +1676,19 @@ function editView(p){
         h('button',{type:'button',class:'icon-btn',title:'Remove this card','aria-label':'Remove card '+(i+1),onclick:()=>removeAt(i)},icon('trash'))));
   }
 
-  /* bulk paste with an explicit separator */
-  let bulkSep=';';
-  const EX={';':'ocean; a large body of salt water\nParis; {Huvudstaden} av {Frankrike}',':':'ocean: a large body of salt water\nParis: {Huvudstaden} av {Frankrike}','-':'ocean - a large body of salt water\nParis - {Huvudstaden} av {Frankrike}',',':'ocean, a large body of salt water\nParis, {Huvudstaden} av {Frankrike}'};
+  /* bulk paste: one card per line, always "word ; definition" */
+  const BULK_EX='ocean ; a large body of salt water\nParis ; The capital of France';
   const bulkInfo=h('p',{class:'bulk-info','aria-live':'polite'});
   const addBulk=btn('Add cards',{cls:'ghost',icon:'plus',disabled:true,onclick:doBulk});
-  const bulk=h('textarea',{id:'bulk',class:'in mono',rows:'5',placeholder:EX[';'],oninput:updBulk});
+  const bulk=h('textarea',{id:'bulk',class:'in mono',rows:'5',placeholder:BULK_EX,oninput:updBulk});
   function updBulk(){
-    const r=parseBulk(bulk.value,bulkSep);
+    const r=parseBulk(bulk.value,';');
     addBulk.disabled=!r.pairs.length;
     addBulk.lastChild.textContent=r.pairs.length?'Add '+r.pairs.length+(r.pairs.length===1?' card':' cards'):'Add cards';
-    bulkInfo.textContent=bulk.value.trim()?(r.pairs.length+' found'+(r.skipped.length?' · '+r.skipped.length+' skipped (no “'+bulkSep+'” in the line)':'')):'';
+    bulkInfo.textContent=bulk.value.trim()?(r.pairs.length+' found'+(r.skipped.length?' · '+r.skipped.length+' skipped (no “;” in the line)':'')):'';
   }
   function doBulk(){
-    const r=parseBulk(bulk.value,bulkSep);if(!r.pairs.length)return;
+    const r=parseBulk(bulk.value,';');if(!r.pairs.length)return;
     const added=r.pairs.map(x=>({id:uid(),w:x.w,d:x.d,e:''}));
     const kept=draft.cards.filter(c=>c.w.trim()||c.d.trim()||c.wi||c.di);
     draft.cards=kept.concat(added);
@@ -1667,14 +1743,13 @@ function editView(p){
         h('p',{class:'hint'},'Used by the speaker buttons. Your device needs a voice for the language.')):null,
       h('div',{class:'field'},
         h('div',{class:'sec-h',style:'margin-bottom:0'},h('span',{class:'lbl'},'Cards'),countEl),
-        h('p',{class:'hint'},'Click into a box to see its tools: make the selected text bold, italic'+(draft.choize?' or a blank':'')+(draft.example?', and fill in an example':'')+'. You can also add an image to either side.'),
+        h('p',{class:'hint'},'Click into a box to add an image (you can also paste one). In a definition you can select a word and turn it into a blank.'),
         slotsBox,
         btn('Add card',{cls:'ghost add-card',icon:'plus',onclick:()=>addAfter(draft.cards.length-1)})),
       h('details',{class:'paste'},
         h('summary',null,'Paste many cards at once'),
         h('div',{class:'bulk'},
-          h('p',{class:'hint'},'One card per line. Choose what sits between the word and the definition:'),
-          seg([[';','; semicolon'],[':',': colon'],['-','- dash'],[',',', comma']],bulkSep,v=>{bulkSep=v;bulk.placeholder=EX[v];updBulk();},'Separator'),
+          h('p',{class:'hint'},'One card per line, with a semicolon between the word and the definition. Example: ',h('span',{class:'mono'},'Paris ; The capital of France')),
           bulk,bulkInfo,h('div',null,addBulk))),
       err,
       h('div',{class:'form-actions'},
@@ -1697,11 +1772,13 @@ function flashView(p){
   const i0=i;
   const face=h('div',{class:'fc-face'});
   const inner=h('div',{class:'fc-inner'},face);
-  const card=h('div',{class:'fc',role:'button',tabindex:'0','aria-label':'Flip card'},inner);
+  const card=h('div',{class:'fc',role:'button',tabindex:'0','aria-label':'Flip card',onmousedown:e=>e.preventDefault()},inner);
   const stage=h('div',{class:'fc-stage'},card);
   const cnt=h('span',{class:'count','aria-live':'polite'});
-  const prev=h('button',{type:'button',class:'round','aria-label':'Previous card',onclick:()=>move(-1)},icon('back'));
-  const next=h('button',{type:'button',class:'round','aria-label':'Next card',onclick:()=>move(1)},icon('next'));
+  /* Mouse clicks must not leave the nav buttons focused: otherwise Space would
+     press the last arrow again instead of flipping the card. */
+  const prev=h('button',{type:'button',class:'round','aria-label':'Previous card',onmousedown:e=>e.preventDefault(),onclick:()=>move(-1)},icon('back'));
+  const next=h('button',{type:'button',class:'round','aria-label':'Next card',onmousedown:e=>e.preventDefault(),onclick:()=>move(1)},icon('next'));
   const sideShown=()=>flipped?(front==='w'?'d':'w'):front;
   function say(){const c=order[i],s=sideShown();speak(c[s],langOf(deck,s));}
   const spk=speakBtn(()=>[{t:order[i][sideShown()],lang:langOf(deck,sideShown())}],'big');
@@ -1740,8 +1817,11 @@ function flashView(p){
   card.addEventListener('click',()=>{if(swiped){swiped=false;return;}flip();});
   setKeys(e=>{
     const t=e.target.tagName;
-    if(e.key==='ArrowLeft'){e.preventDefault();move(-1);}
-    else if(e.key==='ArrowRight'){e.preventDefault();move(1);}
+    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){
+      e.preventDefault();
+      if(t==='BUTTON'&&e.target.blur)e.target.blur();
+      move(e.key==='ArrowLeft'?-1:1);
+    }
     else if((e.key===' '||e.key==='Enter'||e.key==='ArrowUp'||e.key==='ArrowDown')&&t!=='BUTTON'&&t!=='INPUT'&&t!=='SELECT'){e.preventDefault();flip();}
   });
   const opts=h('div',{class:'opts'},
@@ -1863,7 +1943,7 @@ function matchView(p){
   return h('div',{class:'wrap view'},
     studyBar('Match · '+deck.title,'Back',()=>histBack('deck',{id:deck.id})),
     box,
-    h('p',{class:'center-hint desk-only'},'Press the number on a tile to select it. 0 is the tenth tile.'));
+    h('p',{class:'center-hint desk-only'},'Press the number on a tile to select it.'));
 }
 
 /* =====================================================================
@@ -1886,7 +1966,7 @@ function writeEngine(box,cards,o){
   const firstTry=new Map(),attempts=new Map();
   const fill=h('i'),bar=h('div',{class:'pbar',role:'progressbar'},fill),cnt=h('span',{class:'count'});
   const body=h('div',{class:'wq'});
-  box.replaceChildren(h('div',{class:'wtop'},cnt,bar),body);
+  box.replaceChildren(...(o.hideProg?[body]:[h('div',{class:'wtop'},cnt,bar),body]));
   function prog(){fill.style.width=(total?solved/total*100:0)+'%';cnt.textContent=solved+' / '+total;}
   function ask(){
     clearTimeout(timer);unTap();fb=null;cur=null;prog();
@@ -2069,7 +2149,13 @@ function writeEngine(box,cards,o){
   }
   function onKey(e){
     const tag=e.target.tagName,typing=tag==='INPUT'||tag==='TEXTAREA',isBtn=tag==='BUTTON';
-    if(fb){if((e.key==='Enter'||e.key===' '||/^[1-4]$/.test(e.key))&&(!isBtn||e.target.classList.contains('choice'))&&!typing&&!e.repeat){e.preventDefault();advance(fb.ok);}return;}
+    if(fb){
+      const go=e.key==='Enter'||e.key===' '||/^[1-4]$/.test(e.key);
+      if(go&&!typing&&!e.repeat&&(!isBtn||!cur||cur.mode==='mc'||e.target.classList.contains('choice'))){
+        e.preventDefault();advance(fb.ok);
+      }
+      return;
+    }
     if(cur&&cur.mode==='mc'&&/^[1-9]$/.test(e.key)&&!typing){
       const n=+e.key-1;
       if(cur.opts[n]!=null){check(cur.opts[n],cur.area.querySelectorAll('.choice')[n]);}
@@ -2134,8 +2220,7 @@ function writeView(p){
   const opts=h('div',{class:'opts'},
     seg([['wd','Word → Definition'],['dw','Definition → Word']],cfg.dir,v=>{cfg.dir=v;if(eng)eng.refresh();},'Direction'),
     choizeAvail?toggle('Fill in the blank',true,on=>{cfg.choize=on;if(eng)eng.refresh();}):null,
-    TTS?toggle('Read aloud',false,on=>{cfg.auto=on;if(on)stopSpeech();}):null,
-    toggle('AI',false,()=>{},{disabled:true,tag:'Later'}));
+    TTS?toggle('Read aloud',false,on=>{cfg.auto=on;if(on)stopSpeech();}):null);
   const tip=(deck&&deck.choize&&!choizeAvail)?h('p',{class:'center-hint'},'Tip: put {curly brackets} around words in a definition and Fill in the blank turns them into blanks.'):null;
   return h('div',{class:'wrap view'},studyBar(title,'Back',back),opts,h('div',{style:'height:22px'}),box,tip);
 }
@@ -2172,7 +2257,8 @@ function learnView(p){
   onLeave(kill);
   function head(){
     const cur=secs[L.sec]?secs[L.sec].length:0;
-    const f=Math.min(1,(L.doneCards+cur*(L.steps/3))/N);
+    const qf=(cur&&Array.isArray(L.q))?Math.max(0,Math.min(1,1-L.q.length/cur)):0;
+    const f=Math.min(1,(L.doneCards+cur*((L.steps+qf)/3))/N);
     fill.style.width=(f*100)+'%';pct.textContent=Math.round(f*100)+'%';
   }
   const getDir=()=>L.dir;
@@ -2189,8 +2275,8 @@ function learnView(p){
   function sLearn(){
     kill();L.steps=0;head();
     cap.textContent='Choose the correct answer';
-    eng=writeEngine(box,secs[L.sec],{once:true,forceChoice:true,noReview:true,getDir,resume:L.q?{q:L.q}:null,
-      onProgress:s=>{L.q=s.q;saveLearn();},
+    eng=writeEngine(box,secs[L.sec],{once:true,forceChoice:true,noReview:true,hideProg:true,getDir,resume:L.q?{q:L.q}:null,
+      onProgress:s=>{L.q=s.q;head();saveLearn();},
       onAnswer:(c,ok)=>{if(!ok){L.missed.add(c.id);L.everMissed.add(c.id);}saveLearn();},
       onDone:r=>{
         L.q=null;
@@ -2205,16 +2291,16 @@ function learnView(p){
     kill();head();
     if(!L.inc.length){L.q=null;L.steps=2;head();saveLearn();return pW();}
     cap.textContent='Choose again until you get the missed ones right';
-    eng=writeEngine(box,L.inc,{forceChoice:true,noReview:true,getDir,resume:L.q?{q:L.q}:null,
-      onProgress:s=>{L.q=s.q;saveLearn();},
+    eng=writeEngine(box,L.inc,{forceChoice:true,noReview:true,hideProg:true,getDir,resume:L.q?{q:L.q}:null,
+      onProgress:s=>{L.q=s.q;head();saveLearn();},
       onDone:()=>{L.q=null;L.steps=2;head();saveLearn();pW();}});
     setKeys(eng.onKey);
   }
   function pW(){
     kill();head();
     cap.textContent='Now write the answers';
-    eng=writeEngine(box,secs[L.sec],wOpts({noReview:true,resume:L.q?{q:L.q}:null,
-      onProgress:s=>{L.q=s.q;saveLearn();},
+    eng=writeEngine(box,secs[L.sec],wOpts({noReview:true,hideProg:true,resume:L.q?{q:L.q}:null,
+      onProgress:s=>{L.q=s.q;head();saveLearn();},
       onAnswer:(c,ok)=>{if(!ok)L.everMissed.add(c.id);saveLearn();},
       onDone:r=>{
         L.q=null;
@@ -2270,6 +2356,8 @@ function testView(p){
   const N=deck.cards.length;
   const back=()=>histBack('deck',{id:deck.id});
   const root=h('div',{class:'wrap view'});
+  let alive=true;
+  onLeave(()=>{alive=false;});
   const czAvail=deck.choize&&deck.cards.some(c=>hasBlanks(c.d));
   const cfg={count:Math.min(20,N),types:{tf:N>=2,mc:N>=2,wr:true,cz:czAvail},dir:'mix'};
   const TYPE_LABEL={tf:'True / false',mc:'Multiple choice',wr:'Written',cz:'Fill in the blank'};
@@ -2289,12 +2377,11 @@ function testView(p){
           h('p',{class:'hint'},'Your deck has '+N+' cards. Ask for more and the same word comes back later in the test, spaced out.')),
         h('div',{class:'field'},h('span',{class:'lbl'},'Question types'),
           h('div',{class:'setting',style:'display:grid;gap:4px'},
-            ['tf','mc','wr','cz'].map(k=>{
-              const off=(k==='cz'&&!czAvail)||(N<2&&(k==='tf'||k==='mc'));
-              const note=k==='cz'?(!czAvail?' (needs Fill in the blank and {blanks})':''):(off?' (needs 2+ cards)':'');
-              return toggle(TYPE_LABEL[k]+note,cfg.types[k],on=>{cfg.types[k]=on;},{disabled:off});
+            ['tf','mc','wr'].map(k=>{
+              const off=N<2&&(k==='tf'||k==='mc');
+              return toggle(TYPE_LABEL[k]+(off?' (needs 2+ cards)':''),cfg.types[k],on=>{cfg.types[k]=on;},{disabled:off});
             }),
-            toggle('AI deeper questions',false,()=>{},{disabled:true,tag:'Later'}))),
+            czAvail?toggle(TYPE_LABEL.cz,cfg.types.cz,on=>{cfg.types.cz=on;}):null)),
         h('div',{class:'field'},h('span',{class:'lbl'},'Direction'),
           seg([['mix','Mixed'],['wd','Word → Definition'],['dw','Definition → Word']],cfg.dir,v=>{cfg.dir=v;},'Direction')),
         err,
@@ -2437,13 +2524,33 @@ function testView(p){
       h('strong',null,rich(q.prompt)),h('span',{class:'arrow'},'→'),rich(other));
     return h('div',{class:'tf-res'},line('',q.shown),q.isTrue?null:line('good',q.answer));
   }
-  function showResults(qs){
+  const AI_MAX_CHECKS=20;
+  async function showResults(qs){
     setKeys(null);
-    qs.forEach(q=>{
-      q.res=grade(q);q.ok=q.res!=='wrong';
-      if(q.ok)markRight(q.card);else markWrong(q.card);
-    });
+    qs.forEach(q=>{q.res=grade(q);q.ok=q.res!=='wrong';});
+    /* Written answers the exact match rejected get one more look from the AI,
+       exactly like Write does. Only a handful at a time (the server allows 20
+       per minute), and any failure simply keeps the built-in verdict. */
+    const pending=AI?qs.filter(q=>(q.type==='wr'||q.type==='cz')&&q.res==='wrong'&&String(q.given||'').trim()).slice(0,AI_MAX_CHECKS):[];
+    if(pending.length){
+      root.replaceChildren(studyBar('Test · '+deck.title,'Back',back),
+        h('div',{class:'result',style:'margin-top:40px'},
+          h('p',{class:'eyebrow'},'Checking'),
+          h('p',{class:'sub'},'The AI is reading '+pending.length+(pending.length===1?' written answer':' written answers')+' that the exact match rejected…')));
+      const queue=pending.slice();
+      async function worker(){
+        while(queue.length&&alive){
+          const q=queue.shift();
+          const ok=await aiGrade(q.prompt,q.answer,String(q.given).trim(),q.type==='cz');
+          if(ok===true){q.res='ai';q.ok=true;}
+        }
+      }
+      await Promise.all([worker(),worker(),worker()]);
+      if(!alive)return;
+    }
+    qs.forEach(q=>{q.ok=q.res!=='wrong';if(q.ok)markRight(q.card);else markWrong(q.card);});
     const right=qs.filter(q=>q.ok).length;
+    const aiN=qs.filter(q=>q.res==='ai').length;
     const pctv=Math.round(right/qs.length*100);
     recordTest(deck,right,qs.length);
     const hist=deck.stats.tests;
@@ -2463,7 +2570,9 @@ function testView(p){
         (deck.example&&q.card.e&&String(q.card.e).trim())?exLine(q.card.e):null,
         h('div',{class:'q-res '+(q.ok?'ok':'bad')},icon(q.ok?'check':'cross'),
           h('div',null,q.ok
-            ?h('span',null,'Your answer: ',h('strong',null,yours),q.res==='near'?h('span',null,' (small typo, spelled ',h('strong',null,correct),')'):null)
+            ?h('span',null,'Your answer: ',h('strong',null,yours),
+              q.res==='near'?h('span',null,' (small typo, spelled ',h('strong',null,correct),')'):null,
+              q.res==='ai'?h('span',null,' (accepted by AI)'):null)
             :h('span',null,'Your answer: ',h('span',{class:'ans-bad'},yours),h('br'),'Correct: ',h('span',{class:'ans-good'},correct)))));
     });
     root.replaceChildren(studyBar('Test · '+deck.title,'Back',back),
@@ -2471,7 +2580,7 @@ function testView(p){
         h('div',{class:'result',style:'margin:0 0 26px'},
           h('p',{class:'eyebrow'},prevBest!==null&&pctv>prevBest?'New best score':'Test complete'),
           h('div',{class:'score'},h('span',{class:'mark'},right+' / '+qs.length)),
-          h('p',{class:'sub'},pctv+'%'+(prevBest!==null?' · previous best '+prevBest+'%':'')+(right<qs.length?' · missed cards are scheduled for review.':' · perfect score.')),
+          h('p',{class:'sub'},pctv+'%'+(prevBest!==null?' · previous best '+prevBest+'%':'')+(aiN?' · '+aiN+(aiN===1?' answer':' answers')+' accepted by AI.':'')+(right<qs.length?' · missed cards are scheduled for review.':' · perfect score.')),
           h('div',{class:'row'},btn('Retake test',{cls:'primary',onclick:showConfig}),btn('Back to deck',{cls:'ghost',onclick:back}))),
         list));
     window.scrollTo(0,0);
@@ -2523,9 +2632,19 @@ function pubItems(){
     Object.keys(decks).forEach(k=>{
       const d=decks[k];
       if(!d||!Array.isArray(d.cards)||typeof d.title!=='string')return;
-      const cards=d.cards.filter(c=>Array.isArray(c)&&typeof c[0]==='string'&&typeof c[1]==='string').slice(0,500);
+      const cards=d.cards.filter(c=>Array.isArray(c)&&typeof c[0]==='string'&&typeof c[1]==='string').slice(0,500)
+        .map(c=>[String(c[0]),String(c[1]),typeof c[2]==='string'?c[2].slice(0,400):'',
+          typeof c[3]==='string'?c[3]:'',typeof c[4]==='string'?c[4]:'']);
       if(!cards.length)return;
+      const images={};
+      if(d.images&&typeof d.images==='object'&&!Array.isArray(d.images)){
+        Object.keys(d.images).slice(0,60).forEach(id=>{
+          const v=d.images[id];
+          if(typeof v==='string'&&/^data:image\//.test(v)&&v.length<=200000)images[id]=v;
+        });
+      }
       const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,example:!!d.example,
+        images,color:safeColor(d.color),
         langW:typeof d.langW==='string'?d.langW:'',langD:typeof d.langD==='string'?d.langD:'',at:+d.at||0};
       const gid=u+'~'+k,v=t[gid]||{up:0,down:0};
       out.push({gid,builtin:false,mine:u===UID,key:k,deck:clean,up:v.up,down:v.down,score:v.up-v.down,at:d.at||0});
@@ -2544,12 +2663,48 @@ function castVote(gid,val){
   pubChanged();
 }
 const myPublished=()=>(UID&&PUB[UID])||{};
-function publishDeck(d){
+const MAX_PUB_CHARS=1600000;
+/* Public decks are text plus small images. Each picture is re-encoded at 360 px
+   on its long edge (JPEG, quality .6) so a normal deck with a handful of images
+   stays well under the server's request limit. */
+function pubImage(src){
+  return new Promise(res=>{
+    try{
+      const im=new Image();
+      im.onload=()=>{
+        try{
+          const M=360;
+          let w=im.naturalWidth||im.width,hh=im.naturalHeight||im.height;
+          if(!w||!hh)return res(null);
+          const k=Math.min(1,M/Math.max(w,hh));
+          w=Math.max(1,Math.round(w*k));hh=Math.max(1,Math.round(hh*k));
+          const cv=document.createElement('canvas');cv.width=w;cv.height=hh;
+          const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,w,hh);cx.drawImage(im,0,0,w,hh);
+          res(cv.toDataURL('image/jpeg',.6));
+        }catch(e){res(null);}
+      };
+      im.onerror=()=>res(null);
+      im.src=src;
+    }catch(e){res(null);}
+  });
+}
+async function publishDeck(d){
   const mine=Object.assign({},myPublished());
   if(!mine[d.id]&&Object.keys(mine).length>=MAX_PUBLISHED)return 'You can have at most '+MAX_PUBLISHED+' public decks. Unpublish one first.';
   if(d.cards.length<MIN_CARDS)return 'A public deck needs at least '+MIN_CARDS+' cards.';
-  mine[d.id]={title:d.title,desc:d.desc||'',cards:d.cards.map(c=>d.example?[c.w,c.d,c.e||'']:[c.w,c.d]),choize:!!d.choize,example:!!d.example,langW:d.langW||'',langD:d.langD||'',at:Date.now()};
-  if(JSON.stringify(mine).length>200000)return 'That deck is too large to publish. Try splitting it into smaller decks.';
+  const images={},seen=new Set();
+  for(const c of d.cards){
+    for(const k of ['wi','di']){
+      const id=c[k];
+      if(!id||seen.has(id)||!S.images[id])continue;
+      seen.add(id);
+      const small=await pubImage(S.images[id]);
+      if(small)images[id]=small;
+    }
+  }
+  const cards=d.cards.map(c=>[c.w,c.d,d.example?(c.e||''):'',c.wi&&images[c.wi]?c.wi:'',c.di&&images[c.di]?c.di:'']);
+  mine[d.id]={title:d.title,desc:d.desc||'',cards,choize:!!d.choize,example:!!d.example,langW:d.langW||'',langD:d.langD||'',images,color:safeColor(d.color),at:Date.now()};
+  if(JSON.stringify(mine).length>MAX_PUB_CHARS)return 'That deck is too large to publish, even after shrinking its images. Remove a few images or split the deck.';
   PUB[UID]=mine;
   dbQueue('pub_me',{decks:mine},'pub/'+UID);
   pubChanged();
@@ -2687,13 +2842,24 @@ document.addEventListener('keydown',e=>{
   }
 });
 function addCopy(deck,gid){
-  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,langW:deck.langW||'',langD:deck.langD||'',created:Date.now(),pubGid:gid||'',
-    cards:deck.cards.map(c=>Array.isArray(c)?{id:uid(),w:c[0],d:c[1],e:c[2]||''}:{id:uid(),w:c.w,d:c.d,e:c.e||''})};
+  const pubImages=deck.images&&typeof deck.images==='object'?deck.images:{};
+  const remap={};
+  Object.keys(pubImages).forEach(id=>{
+    let nid=id;
+    if(S.images[id]&&S.images[id]!==pubImages[id]){nid=uid();while(S.images[nid])nid=uid();}
+    S.images[nid]=pubImages[id];remap[id]=nid;
+  });
+  const imgId=id=>id&&remap[id]?remap[id]:null;
+  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,langW:deck.langW||'',langD:deck.langD||'',color:safeColor(deck.color),created:Date.now(),pubGid:gid||'',
+    cards:deck.cards.map(c=>Array.isArray(c)
+      ?{id:uid(),w:c[0],d:c[1],e:c[2]||'',wi:imgId(c[3]),di:imgId(c[4])}
+      :{id:uid(),w:c.w,d:c.d,e:c.e||'',wi:imgId(c.wi),di:imgId(c.di)})};
   // Saving a built-in deck keeps a live link to it instead of a frozen copy, so
   // later edits to the built-in deck show up here too. Community decks are still
   // copied as before.
   if(gid&&/^bi:/.test(gid)&&builtinOf(gid)){d.src=gid;hydrateDeck(d);}
   S.decks.push(d);touchDeck(d);
+  if(Object.keys(remap).length)syncImages(Object.keys(remap).map(k=>remap[k]));
   return d;
 }
 /* --- Public decks, opened like any other deck ---
@@ -2729,7 +2895,7 @@ function loginNote(what){
 const hidden=it=>!it.builtin&&!it.mine&&it.score<=HIDE_AT;
 
 function pubTile(it){
-  return h('button',{type:'button',class:'deck',onclick:()=>openPublic(it)},
+  return h('button',{type:'button',class:'deck'+(it.deck.color?' c-colored':''),style:it.deck.color?('--dc:'+it.deck.color):null,onclick:()=>openPublic(it)},
     h('span',{class:'tag'+(it.builtin?' hl':'')},it.builtin?'Built in':(it.mine?'Yours':'Community')),
     h('h3',null,it.deck.title),
     it.deck.desc?h('p',null,it.deck.desc):null,
@@ -2810,7 +2976,7 @@ function pubDeckView(p){
       h('details',{class:'cards-list'},
         h('summary',null,'Cards in this deck ('+n+')'),
         h('div',{class:'cl'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
-          d.cards.slice(0,200).map(c=>[h('div',null,rich(c[0])),h('div',null,rich(c[1]))]))),
+          d.cards.slice(0,200).map(c=>[h('div',null,pubCimg(d,c[3],'cl-img'),rich(c[0])),h('div',null,pubCimg(d,c[4],'cl-img'),rich(c[1]))]))),
       n>200?h('p',{class:'hint'},'Showing the first 200 of '+n+' cards.'):null].filter(Boolean));
   }
   setPubHook(paint);

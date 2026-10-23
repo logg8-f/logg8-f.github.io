@@ -30,7 +30,7 @@ const DATA_DIR = path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const OWNERS_FILE = path.join(DATA_DIR, 'owners.json'); // path -> the token that owns it
 
-const MAX_BODY = 300 * 1024; // biggest single write we accept (bytes)
+const MAX_BODY = 2 * 1024 * 1024; // biggest single write we accept (bytes); leaves room for a published deck with shrunk images
 const MAX_DECKS = 15;        // public decks a single publisher may have
 const MIN_CARDS = 4;         // cards a public deck must have
 const RATE_MAX = 40;         // writes allowed per IP in the window below.
@@ -398,6 +398,7 @@ async function gradeWithAI(q, a, u, blank) {
 }
 
 /* ---------- rules for what may be published ---------- */
+const MAX_PUB_CHARS = 1800000;
 function checkPub(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'bad data';
   const decks = data.decks;
@@ -411,7 +412,18 @@ function checkPub(data) {
     if (!Array.isArray(d.cards) || d.cards.length < MIN_CARDS) {
       return 'a public deck needs at least ' + MIN_CARDS + ' cards';
     }
+    if (d.images != null) {
+      if (typeof d.images !== 'object' || Array.isArray(d.images)) return 'bad images';
+      const ids = Object.keys(d.images);
+      if (ids.length > 60) return 'too many images in a deck';
+      for (const id of ids) {
+        const v = d.images[id];
+        if (typeof v !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(v)) return 'bad image';
+        if (v.length > 200000) return 'an image is too large';
+      }
+    }
   }
+  if (JSON.stringify(data).length > MAX_PUB_CHARS) return 'that deck is too large';
   return null;
 }
 

@@ -229,7 +229,8 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--hl);color:var(--on-hl)}
 .opts .tg{padding:0;gap:10px;font-size:14px}
 .desk-only{display:none}
-@media (hover:hover) and (pointer:fine){.desk-only{display:block}.kc{display:inline-flex!important}}
+.touch-only{display:block}
+@media (hover:hover) and (pointer:fine){.desk-only{display:block}.touch-only{display:none}.kc{display:inline-flex!important}}
 .kc{display:none;flex:none;min-width:22px;height:22px;padding:0 4px;align-items:center;justify-content:center;border:1px solid var(--line);border-bottom-width:2.5px;border-radius:5px;font:500 11px var(--f-mono);color:var(--ink-2);background:var(--bg)}
 .center-hint{text-align:center;font-size:13px;color:var(--ink-2);margin-top:14px}
 
@@ -407,6 +408,8 @@ select.in{appearance:auto}
 .pubbox .confirm{background:var(--surface-2);border-color:var(--ink)}
 .toolbar .in{flex:1;min-width:0}
 .votes{display:flex;gap:10px}
+.vote-net{display:inline-flex;align-items:center;gap:4px}
+.vote-net .i svg{width:1.05em;height:1.05em}
 .vbtn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font:600 14px var(--f-mono)}
 .vbtn:hover:not(:disabled){border-color:var(--ink)}
 .vbtn[aria-pressed="true"]{background:var(--hl);color:var(--on-hl);border-color:var(--ink)}
@@ -450,7 +453,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.11.1';
+const APP_VERSION='2.12.0';
 
 /* =====================================================================
    Pure helpers
@@ -514,10 +517,20 @@ function splitLine(line,sep){
 }
 function parseBulk(text,sep){
   const pairs=[],skipped=[];
-  String(text||'').split(/\r?\n/).forEach(l=>{
-    if(!l.trim())return;
-    const p=splitLine(l,sep||';');
-    if(p)pairs.push(p);else skipped.push(l.trim());
+  const s=sep||';';
+  String(text||'').split(/\r?\n/).forEach(raw=>{
+    const line=raw.trim();
+    if(!line)return;
+    if(s===';'){
+      /* word ; definition ; example (the example is optional and may contain “;”) */
+      const a=line.split(';');
+      const w=(a[0]||'').trim(),d=(a[1]||'').trim(),e=a.slice(2).join(';').trim();
+      if(!w||!d){skipped.push(line);return;}
+      pairs.push({w,d,e});
+      return;
+    }
+    const p=splitLine(line,s);
+    if(p)pairs.push({w:p.w,d:p.d,e:''});else skipped.push(line);
   });
   return{pairs,skipped};
 }
@@ -632,6 +645,8 @@ const ICON={
   bulb:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0012 3z"/></svg>',
   up:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11l6-6 6 6"/></svg>',
   down:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v13M6 13l6 6 6-6"/></svg>',
+  like:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v11H4a1 1 0 01-1-1v-9a1 1 0 011-1h3zM7 10l4.6-7.4a1 1 0 011.7.2c.4 1 .6 2.1.6 3.2V9h4.6a2 2 0 012 2.3l-1.2 7A2 2 0 0117.4 20H7"/></svg>',
+  shuffle:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3.5c1.6 0 3 .8 4 2l3 4c1 1.2 2.4 2 4 2H21M18 4l3 3-3 3M3 17h3.5c1.6 0 3-.8 4-2l.6-.8M14.5 9.5l.5-.7c1-1.2 2.4-2 4-2H21M18 20l3-3-3-3"/></svg>',
   globe:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>',
   export:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M5 21h14"/></svg>'
 };
@@ -1674,6 +1689,7 @@ function editView(p){
         }
       },
       onkeydown:e=>{
+        if(e.key==='Enter'&&e.shiftKey){e.preventDefault();addAfter(i);return;}
         if(e.key!=='Enter')return;
         e.preventDefault();
         if(side==='w'){document.getElementById('d-'+c.id).focus();return;}
@@ -1706,6 +1722,7 @@ function editView(p){
       oninput:e=>{c.e=e.target.value;upd();persist();},
       onfocus:()=>{lastField=inp;},
       onkeydown:e=>{
+        if(e.key==='Enter'&&e.shiftKey){e.preventDefault();addAfter(i);return;}
         if(e.key!=='Enter')return;
         e.preventDefault();
         const nx=draft.cards[i+1];
@@ -1745,12 +1762,13 @@ function editView(p){
     const r=parseBulk(bulk.value,';');
     addBulk.disabled=!r.pairs.length;
     addBulk.lastChild.textContent=r.pairs.length?'Add '+r.pairs.length+(r.pairs.length===1?' card':' cards'):'Add cards';
-    bulkInfo.textContent=bulk.value.trim()?(r.pairs.length+' found'+(r.skipped.length?' · '+r.skipped.length+' skipped (no “;” in the line)':'')):'';
+    bulkInfo.textContent=bulk.value.trim()?(r.pairs.length+' found'+(r.skipped.length?' · '+r.skipped.length+' skipped (needs word ; definition)':'')):'';
   }
   function doBulk(){
     const r=parseBulk(bulk.value,';');if(!r.pairs.length)return;
-    const added=r.pairs.map(x=>({id:uid(),w:x.w,d:x.d,e:''}));
-    const kept=draft.cards.filter(c=>c.w.trim()||c.d.trim()||c.wi||c.di);
+    const added=r.pairs.map(x=>({id:uid(),w:x.w,d:x.d,e:x.e||''}));
+    if(added.some(c=>c.e)){draft.example=true;if(exSw)exSw.setAttribute('aria-checked','true');}
+    const kept=draft.cards.filter(c=>c.w.trim()||c.d.trim()||c.wi||c.di||(c.e||'').trim());
     draft.cards=kept.concat(added);
     bulk.value='';updBulk();renderSlots();
   }
@@ -1812,7 +1830,7 @@ function editView(p){
       h('details',{class:'paste'},
         h('summary',null,'Paste many cards at once'),
         h('div',{class:'bulk'},
-          h('p',{class:'hint'},'One card per line, with a semicolon between the word and the definition. Example: ',h('span',{class:'mono'},'Paris ; The capital of France')),
+          h('p',{class:'hint'},'One card per line: word ; definition. Add an optional third part for an example: word ; definition ; example. Example: ',h('span',{class:'mono'},'Paris ; The capital of France'),' ',h('button',{type:'button',class:'btn link',style:'padding:2px 4px;font-size:13px',onclick:()=>{bulk.value='Paris ; The capital of France';updBulk();bulk.focus();}},'Insert example')),
           bulk,bulkInfo,h('div',null,addBulk))),
       err,
       h('div',{class:'form-actions'},
@@ -1885,11 +1903,15 @@ function flashView(p){
       if(t==='BUTTON'&&e.target.blur)e.target.blur();
       move(e.key==='ArrowLeft'?-1:1);
     }
-    else if((e.key===' '||e.key==='Enter'||e.key==='ArrowUp'||e.key==='ArrowDown')&&t!=='BUTTON'&&t!=='INPUT'&&t!=='SELECT'){e.preventDefault();flip();}
+    else if((e.key===' '||e.key==='Enter'||e.key==='ArrowUp'||e.key==='ArrowDown')&&!e.repeat&&t!=='BUTTON'&&t!=='INPUT'&&t!=='SELECT'){e.preventDefault();flip();}
   });
+  const shufBtn=btn('Shuffle',{cls:'ghost',icon:'shuffle',onclick:()=>{
+    order=shuffle(deck.cards);show(0);
+    shufBtn.lastChild.textContent='Shuffle again';
+  }});
   const opts=h('div',{class:'opts'},
     seg([['w','Word first'],['d','Definition first']],front,v=>{front=v;show(i);},'Which side shows first'),
-    toggle('Shuffle',false,on=>{order=on?shuffle(deck.cards):deck.cards.slice();show(0);}),
+    shufBtn,
     TTS?toggle('Read aloud automatically',false,on=>{auto=on;if(on)say();else stopSpeech();}):null);
   show(i0);
   return h('div',{class:'wrap view'},
@@ -1898,7 +1920,7 @@ function flashView(p){
     h('div',{class:'fc-nav'},prev,h('div',{class:'cnt-wrap'},cnt,spk),next),
     opts,
     h('p',{class:'center-hint desk-only'},'← → to move · Space to flip'),
-    h('p',{class:'center-hint'},'Tap the card to flip it. Swipe left or right to change card.'));
+    h('p',{class:'center-hint touch-only'},'Tap the card to flip it. Swipe left or right to change card.'));
 }
 
 /* =====================================================================
@@ -2979,7 +3001,9 @@ function pubTile(it){
     h('span',{class:'tag'+(it.builtin?' hl':'')},it.builtin?'Built in':(it.mine?'Yours':'Community')),
     h('h3',null,it.deck.title),
     it.deck.desc?h('p',null,it.deck.desc):null,
-    h('span',{class:'meta'},dc?h('span',{class:'deck-dot','aria-hidden':'true'}):null,it.deck.cards.length+' cards'+(it.builtin?'':' · '+(it.score>0?'+':'')+it.score)));
+    h('span',{class:'meta'},dc?h('span',{class:'deck-dot','aria-hidden':'true'}):null,it.deck.cards.length+' cards',
+      it.builtin?null:' · ',
+      it.builtin?null:h('span',{class:'vote-net',title:'Likes minus dislikes'},icon('like'),(it.score>0?'+':it.score<0?'−':'')+Math.abs(it.score))));
 }
 function browseView(){
   let q='',cat='all',sort='top';
@@ -2988,7 +3012,7 @@ function browseView(){
   const search=h('input',{type:'search',class:'in',placeholder:'Search decks, words or definitions',autocomplete:'off','aria-label':'Search public decks',
     oninput:e=>{q=e.target.value;paint();}});
   const catSeg=seg([['all','All'],['builtin','Built in'],['community','Community'],['mine','Yours']],cat,v=>{cat=v;paint();},'Show');
-  const sortSeg=seg([['top','Top rated'],['new','Newest']],sort,v=>{sort=v;paint();},'Sort community decks');
+  const sortSeg=seg([['top','Top rated'],['popular','Popular']],sort,v=>{sort=v;paint();},'Sort community decks');
   function match(it){
     const toks=norm(q).split(' ').filter(Boolean);
     if(!toks.length)return true;
@@ -3001,7 +3025,7 @@ function browseView(){
     else if(cat==='community')items=items.filter(i=>!i.builtin);
     else if(cat==='mine')items=items.filter(i=>i.mine);
     const b=items.filter(i=>i.builtin),c=items.filter(i=>!i.builtin);
-    c.sort(sort==='new'?(x,y)=>y.at-x.at:(x,y)=>(y.score-x.score)||(y.at-x.at));
+    c.sort(sort==='popular'?(x,y)=>(y.up-x.up)||(y.score-x.score)||(y.at-x.at):(x,y)=>(y.score-x.score)||(y.at-x.at));
     const all=b.concat(c);
     list.replaceChildren(...all.map(pubTile));
     const nc=c.length;

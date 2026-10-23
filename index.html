@@ -453,7 +453,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.12.0';
+const APP_VERSION='2.13.0';
 
 /* =====================================================================
    Pure helpers
@@ -1616,9 +1616,11 @@ function editView(p){
   const blank=()=>({id:uid(),w:'',d:'',e:''});
   let saved=null;
   if(p.restore){try{const o=JSON.parse(sessionStorage.getItem(DKEY)||'null');if(o&&o.forId===(p.id||null))saved=o.draft;}catch(e){}}
-  const draft=saved||(orig?clone(orig):{id:uid(),title:'',desc:'',choize:true,example:false,color:'',langW:'',langD:'',cards:[blank()],created:Date.now()});
+  const draft=saved||(orig?clone(orig):{id:uid(),title:'',desc:'',choize:true,example:false,color:'',langW:'',langD:'',aiHint:true,aiGrade:true,cards:[blank()],created:Date.now()});
   if(!draft.cards||!draft.cards.length)draft.cards=[blank()];
   draft.langW=draft.langW||'';draft.langD=draft.langD||'';draft.color=safeColor(draft.color);
+  if(draft.aiHint==null)draft.aiHint=true;
+  if(draft.aiGrade==null)draft.aiGrade=true;
   const newImgs=new Set();
   if(saved){const used=usedImages();draft.cards.forEach(c=>['wi','di'].forEach(k=>{if(c[k]&&!used.has(c[k]))newImgs.add(c[k]);}));}
   let lastField=null,saveT=null;
@@ -1636,6 +1638,12 @@ function editView(p){
   }},h('span',{class:'knob'}));
   const exSw=h('button',{type:'button',role:'switch',class:'switch',id:'f-example','aria-labelledby':'example-l','aria-checked':String(!!draft.example),onclick:()=>{
     draft.example=!draft.example;exSw.setAttribute('aria-checked',String(draft.example));persist();renderSlots();
+  }},h('span',{class:'knob'}));
+  const aiHintSw=h('button',{type:'button',role:'switch',class:'switch',id:'f-aihint','aria-labelledby':'aihint-l','aria-checked':String(!!draft.aiHint),onclick:()=>{
+    draft.aiHint=!draft.aiHint;aiHintSw.setAttribute('aria-checked',String(draft.aiHint));persist();
+  }},h('span',{class:'knob'}));
+  const aiGradeSw=h('button',{type:'button',role:'switch',class:'switch',id:'f-aigrade','aria-labelledby':'aigrade-l','aria-checked':String(!!draft.aiGrade),onclick:()=>{
+    draft.aiGrade=!draft.aiGrade;aiGradeSw.setAttribute('aria-checked',String(draft.aiGrade));persist();
   }},h('span',{class:'knob'}));
   const infoBtn=h('button',{type:'button','aria-label':'What is Fill in the blank?','aria-expanded':'false',onclick:()=>{
     const o=info.classList.toggle('open');infoBtn.setAttribute('aria-expanded',String(o));
@@ -1794,7 +1802,7 @@ function editView(p){
     }
     if(!out.length){err.textContent='Add at least one card with a word and a definition.';return;}
     let target;
-    const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,example:!!draft.example,color:safeColor(draft.color),langW:draft.langW,langD:draft.langD,cards:out};
+    const fields={title:t,desc:draft.desc.trim(),choize:draft.choize,example:!!draft.example,color:safeColor(draft.color),langW:draft.langW,langD:draft.langD,aiHint:!!draft.aiHint,aiGrade:!!draft.aiGrade,cards:out};
     if(orig){Object.assign(orig,fields);if(orig.src){delete orig.src;orig.noLink=true;}target=orig;}
     else{target=Object.assign({id:draft.id,created:draft.created},fields);S.decks.push(target);}
     touchDeck(target);syncImages(Array.from(newImgs));pruneReview(false);
@@ -1819,6 +1827,14 @@ function editView(p){
         h('div',{class:'setting-l'},
           h('strong',{id:'example-l'},'Example'),
           h('p',{class:'hint'},'Adds a third field to each card. An example is shown only after you answer — never in the question or the choices.')),exSw),
+      h('div',{class:'setting'},
+        h('div',{class:'setting-l'},
+          h('strong',{id:'aihint-l'},'AI hints'),
+          h('p',{class:'hint'},'Adds an AI hint button to Write. The letter hint still works without it. Needs AI on the server.')),aiHintSw),
+      h('div',{class:'setting'},
+        h('div',{class:'setting-l'},
+          h('strong',{id:'aigrade-l'},'AI grading'),
+          h('p',{class:'hint'},'Lets the AI re-check typed answers that the exact match rejects, so a paraphrase can count. When on, the “very close, try again?” prompt is skipped. Needs AI on the server.')),aiGradeSw),
       TTS?h('div',{class:'field'},h('span',{class:'lbl'},'Read aloud languages'),
         h('div',{class:'two'},langSel('f-lw','langW','Words'),langSel('f-ld','langD','Definitions')),
         h('p',{class:'hint'},'Used by the speaker buttons. Your device needs a voice for the language.')):null,
@@ -2106,7 +2122,7 @@ function writeEngine(box,cards,o){
         if(cur.hints>=letterCount(answer))hintBtn.disabled=true;
         inp.focus();
       }});
-      const aiBtn=AI?btn('AI hint',{cls:'ghost',icon:'bulb',onclick:async()=>{
+      const aiBtn=AI&&c.deck.aiHint!==false?btn('AI hint',{cls:'ghost',icon:'bulb',onclick:async()=>{
         if(fb||aiBtn.disabled)return;
         const mine=cur;
         aiBtn.disabled=true;
@@ -2158,10 +2174,11 @@ function writeEngine(box,cards,o){
     const answer=cur.answer;
     if(cur.mode==='mc'){finalize(val!=null&&norm(val)===norm(answer),val,false,btnEl);return;}
     const res=judge(val,answer);
-    if(res.r==='near'){nearPanel(val,res);return;}
+    const useAI=AI&&cur.c.deck.aiGrade!==false;
+    if(res.r==='near'&&!useAI){nearPanel(val,res);return;}
     if(res.r==='exact'){finalize(true,val,false);return;}
     const raw=val!=null?String(val).trim():'';
-    if(raw&&AI){
+    if(raw&&useAI){
       const mine=cur;
       busy=true;mine.actions.hidden=true;
       const note=h('p',{class:'ask ai-note'},'Checking your wording…');
@@ -2632,7 +2649,7 @@ function testView(p){
     /* Written answers the exact match rejected get one more look from the AI,
        exactly like Write does. Only a handful at a time (the server allows 20
        per minute), and any failure simply keeps the built-in verdict. */
-    const pending=AI?qs.filter(q=>(q.type==='wr'||q.type==='cz')&&q.res==='wrong'&&String(q.given||'').trim()).slice(0,AI_MAX_CHECKS):[];
+    const pending=AI&&deck.aiGrade!==false?qs.filter(q=>(q.type==='wr'||q.type==='cz')&&q.res==='wrong'&&String(q.given||'').trim()).slice(0,AI_MAX_CHECKS):[];
     if(pending.length){
       root.replaceChildren(studyBar('Test · '+deck.title,'Back',back),
         h('div',{class:'result',style:'margin-top:40px'},
@@ -2744,7 +2761,7 @@ function pubItems(){
           if(typeof v==='string'&&/^data:image\//.test(v)&&v.length<=200000)images[id]=v;
         });
       }
-      const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,example:!!d.example,
+      const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,example:!!d.example,aiHint:d.aiHint!==false,aiGrade:d.aiGrade!==false,
         images,color:safeColor(d.color),
         langW:typeof d.langW==='string'?d.langW:'',langD:typeof d.langD==='string'?d.langD:'',at:+d.at||0};
       const gid=u+'~'+k,v=t[gid]||{up:0,down:0};
@@ -2804,7 +2821,7 @@ async function publishDeck(d){
     }
   }
   const cards=d.cards.map(c=>[c.w,c.d,d.example?(c.e||''):'',c.wi&&images[c.wi]?c.wi:'',c.di&&images[c.di]?c.di:'']);
-  mine[d.id]={title:d.title,desc:d.desc||'',cards,choize:!!d.choize,example:!!d.example,langW:d.langW||'',langD:d.langD||'',images,color:safeColor(d.color),at:Date.now()};
+  mine[d.id]={title:d.title,desc:d.desc||'',cards,choize:!!d.choize,example:!!d.example,aiHint:d.aiHint!==false,aiGrade:d.aiGrade!==false,langW:d.langW||'',langD:d.langD||'',images,color:safeColor(d.color),at:Date.now()};
   if(JSON.stringify(mine).length>MAX_PUB_CHARS)return 'That deck is too large to publish, even after shrinking its images. Remove a few images or split the deck.';
   PUB[UID]=mine;
   dbQueue('pub_me',{decks:mine},'pub/'+UID);
@@ -2951,7 +2968,7 @@ function addCopy(deck,gid){
     S.images[nid]=pubImages[id];remap[id]=nid;
   });
   const imgId=id=>id&&remap[id]?remap[id]:null;
-  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,langW:deck.langW||'',langD:deck.langD||'',color:safeColor(deck.color),created:Date.now(),pubGid:gid||'',
+  const d={id:uid(),title:deck.title,desc:deck.desc||'',choize:!!deck.choize,example:!!deck.example,aiHint:deck.aiHint!==false,aiGrade:deck.aiGrade!==false,langW:deck.langW||'',langD:deck.langD||'',color:safeColor(deck.color),created:Date.now(),pubGid:gid||'',
     cards:deck.cards.map(c=>Array.isArray(c)
       ?{id:uid(),w:c[0],d:c[1],e:c[2]||'',wi:imgId(c[3]),di:imgId(c[4])}
       :{id:uid(),w:c.w,d:c.d,e:c.e||'',wi:imgId(c.wi),di:imgId(c.di)})};

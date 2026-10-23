@@ -222,6 +222,12 @@ default**, costs nothing unless you add a key, and if the key is missing or the
 service is unreachable the app simply falls back to the normal matching (and the
 letter hint), so studying never breaks.
 
+Once the server has a key, each deck can turn **AI hints** and **AI grading** on
+or off in the deck editor. With AI grading on, an answer that is one letter away
+goes straight to the AI instead of showing the “very close, try again?” stop.
+With it off, that near-spelling prompt stays, and only the normal matching is
+used. AI hints only add the extra button; the letter hint is always there.
+
 To turn it on, give the server a free Groq API key (get one at
 https://console.groq.com):
 

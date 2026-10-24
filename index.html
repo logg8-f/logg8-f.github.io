@@ -453,7 +453,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.15.0';
+const APP_VERSION='2.15.1';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -561,10 +561,15 @@ function pairsPerRound(n){return n<=5?n:(n<=8?Math.ceil(n/2):5);}
 function variants(ans){
   const out=new Set();
   const add=s=>{const n=loose(s);if(n)out.add(n);};
+  /* People often leave out an apostrophe entirely instead of turning it into a
+     space: “cote divoire” for “Côte d'Ivoire”. Add that form too, without
+     changing how ordinary spaces are treated. */
+  const addNoApos=s=>{if(/['’‘`´ʼ]/.test(s))add(s.replace(/['’‘`´ʼ]/g,''));};
+  const addBoth=s=>{add(s);addNoApos(s);};
   const strip=s=>s.replace(/\([^)]*\)/g,' ');
   ans=plain(ans);
-  add(ans);add(strip(ans));
-  ans.split(/\s*[;\/,]\s*/).forEach(p=>{add(p);add(strip(p));});
+  addBoth(ans);addBoth(strip(ans));
+  ans.split(/\s*[;\/,]\s*/).forEach(p=>{addBoth(p);addBoth(strip(p));});
   return Array.from(out);
 }
 function isRight(given,answer){

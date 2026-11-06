@@ -439,6 +439,25 @@ async function hintWithAI(q, a) {
   finally { clearTimeout(to); }
 }
 
+/* ---------- memo cache for AI answers ----------
+   Identical prompts come back instantly and cost no Groq quota: a learner who
+   clicks the hint twice, retypes the same answer, or opens Test again gets the
+   cached verdict. The cache is small, in-memory and expires after 30 minutes. */
+const AI_CACHE_MS = 30 * 60 * 1000;
+const AI_CACHE_MAX = 500;
+const aiCache = new Map();
+function aiCacheGet(key) {
+  const hit = aiCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() > hit.until) { aiCache.delete(key); return undefined; }
+  return hit.value;
+}
+function aiCacheSet(key, value) {
+  aiCache.delete(key);
+  aiCache.set(key, { value, until: Date.now() + AI_CACHE_MS });
+  while (aiCache.size > AI_CACHE_MAX) aiCache.delete(aiCache.keys().next().value);
+}
+
 /* ---------- rules for what may be published ---------- */
 const MAX_PUB_CHARS = 1800000;
 function checkPub(data) {
@@ -544,7 +563,13 @@ const server = http.createServer(async (req, res) => {
       const a = String((body && body.a) || '').slice(0, 400).trim();
       const u = String((body && body.u) || '').slice(0, 400).trim();
       if (!a || !u) return json(res, 200, { ok: false, reason: 'empty' });
-      const verdict = await gradeWithAI(q, a, u, (body && body.t) === 'blank');
+      const blank = (body && body.t) === 'blank';
+      const ck = 'g\n' + q + '\n' + a + '\n' + u + '\n' + (blank ? 'b' : 't');
+      let verdict = aiCacheGet(ck);
+      if (verdict === undefined) {
+        verdict = await gradeWithAI(q, a, u, blank);
+        if (verdict !== null) aiCacheSet(ck, verdict);
+      }
       if (verdict === null) return json(res, 200, { ok: false, reason: 'unavailable' });
       return json(res, 200, { ok: true, correct: verdict });
     }
@@ -559,7 +584,12 @@ const server = http.createServer(async (req, res) => {
       const q = String((body && body.q) || '').slice(0, 200).trim();
       const a = String((body && body.a) || '').slice(0, 400).trim();
       if (!a) return json(res, 200, { ok: false, reason: 'empty' });
-      const hint = await hintWithAI(q, a);
+      const ck = 'h\n' + q + '\n' + a;
+      let hint = aiCacheGet(ck);
+      if (hint === undefined) {
+        hint = await hintWithAI(q, a);
+        if (hint) aiCacheSet(ck, hint);
+      }
       if (!hint) return json(res, 200, { ok: false, reason: 'unavailable' });
       return json(res, 200, { ok: true, hint });
     }

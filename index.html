@@ -453,7 +453,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.15.3';
+const APP_VERSION='2.15.4';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -1003,6 +1003,7 @@ function recordTest(deck,right,total){
    and keep it in the browser, so each visitor has their own corner. */
 const API_BASE='api/';
 let AI=false;                 // becomes true once the server reports AI grading is on
+let AI_KNOWN=false;           // true once /api/health has answered (on or off)
 const ANON_KEY='quizlet2.anon';
 const TOKEN_KEY='quizlet2.token';
 /* A secret, per-browser key used to prove "this deck is mine to change". It is
@@ -1108,32 +1109,62 @@ async function probeApi(){
   try{
     const r=await fetch(API_BASE+'health',{cache:'no-store'});
     if(!r.ok)return null;
-    try{const j=await r.json();AI=!!(j&&j.ai);AUTH={on:!!(j&&j.auth),clientId:String((j&&j.clientId)||'')};}catch(e){}
+    try{const j=await r.json();AI=!!(j&&j.ai);AI_KNOWN=true;AUTH={on:!!(j&&j.auth),clientId:String((j&&j.clientId)||'')};syncAiButtons();}catch(e){}
     return apiDb();
   }catch(e){return null;}
 }
 /* Ask the server to have an AI judge whether a typed answer means the same as the
    expected one. Returns true/false, or null when AI grading is unavailable (no key,
    offline, rate-limited) — the caller then falls back to plain exact/near matching. */
+/* Results are also memoised in this tab: a repeated hint or the same wrong answer
+   is instant and costs no extra Groq request. */
+const AI_MEMO=new Map();
+function memoGet(k){const v=AI_MEMO.get(k);if(v===undefined)return undefined;AI_MEMO.delete(k);AI_MEMO.set(k,v);return v;}
+function memoSet(k,v){AI_MEMO.delete(k);AI_MEMO.set(k,v);while(AI_MEMO.size>300)AI_MEMO.delete(AI_MEMO.keys().next().value);}
+/* The server says AI is off, or the Groq call failed: stop rendering AI hint
+   buttons and remove the one on screen. A local "slow down" is temporary, so it
+   does not switch AI off. */
+function aiOff(reason){
+  if(reason!=='off'&&reason!=='unavailable')return;
+  AI=false;AI_KNOWN=true;
+  syncAiButtons();
+}
+/* Keep AI hint buttons in step with the health check. Before /api/health has
+   answered they are rendered but hidden, so a resumed Write view can reveal
+   them without a re-render (and without losing what the person has typed). */
+function syncAiButtons(){
+  document.querySelectorAll('.ai-hint-btn').forEach(b=>{
+    if(AI_KNOWN&&!AI){b.remove();return;}
+    b.hidden=!AI;
+  });
+}
 async function aiGrade(q,a,u,blank){
+  const ck='g\n'+q+'\n'+a+'\n'+u+'\n'+(blank?'b':'t');
+  const hit=memoGet(ck);
+  if(hit!==undefined)return hit;
   try{
     const r=await fetch(API_BASE+'grade',{method:'POST',cache:'no-store',
       headers:{'content-type':'application/json'},
       body:JSON.stringify({q,a,u,t:blank?'blank':'text'})});
-    if(!r.ok)return null;
-    const j=await r.json();
-    return j&&j.ok?(j.correct===true):null;
+    const j=await r.json().catch(()=>null);
+    if(!j||!j.ok){aiOff(j&&j.reason);return null;}
+    const ok=j.correct===true;memoSet(ck,ok);return ok;
   }catch(e){return null;}
 }
 /* A short AI nudge about the meaning of the answer, or null when unavailable. */
 async function aiHint(q,a){
+  const ck='h\n'+q+'\n'+a;
+  const hit=memoGet(ck);
+  if(hit!==undefined)return hit;
   try{
     const r=await fetch(API_BASE+'hint',{method:'POST',cache:'no-store',
       headers:{'content-type':'application/json'},
       body:JSON.stringify({q,a})});
-    if(!r.ok)return null;
-    const j=await r.json();
-    return j&&j.ok?String(j.hint||''):null;
+    const j=await r.json().catch(()=>null);
+    if(!j||!j.ok){aiOff(j&&j.reason);return null;}
+    const h=String(j.hint||'');
+    if(!h)return null;
+    memoSet(ck,h);return h;
   }catch(e){return null;}
 }
 
@@ -2156,7 +2187,7 @@ function writeEngine(box,cards,o){
         if(cur.hints>=letterCount(answer))hintBtn.disabled=true;
         inp.focus();
       }});
-      const aiBtn=AI&&c.deck.aiHint!==false?btn('AI hint',{cls:'ghost',icon:'bulb',onclick:async()=>{
+      const aiBtn=c.deck.aiHint!==false&&(AI||!AI_KNOWN)?btn('AI hint',{cls:'ghost ai-hint-btn',icon:'bulb',onclick:async()=>{
         if(fb||aiBtn.disabled)return;
         const mine=cur;
         aiBtn.disabled=true;
@@ -2169,11 +2200,12 @@ function writeEngine(box,cards,o){
           hintBtn.lastChild.textContent='Hint ('+mine.hints+')';
           if(mine.hints>=letterCount(answer))hintBtn.disabled=true;
         }else{
-          aiLine.textContent='No AI hint right now — use the letter hint instead.';
-          aiBtn.disabled=false;
+          aiLine.textContent=AI?'No AI hint right now — use the letter hint instead.':'AI hints are unavailable right now — use the letter hint instead.';
+          if(AI)aiBtn.disabled=false;
         }
         try{inp.focus();}catch(e){}
       }}):null;
+      if(aiBtn)aiBtn.hidden=!AI;
       const actions=h('div',{class:'row'},
         btn('Check',{cls:'primary',onclick:()=>check(inp.value)}),
         hintBtn,
@@ -2704,7 +2736,7 @@ function testView(p){
           h('p',{class:'sub'},'The AI is reading '+pending.length+(pending.length===1?' written answer':' written answers')+' that the exact match rejected…')));
       const queue=pending.slice();
       async function worker(){
-        while(queue.length&&alive){
+        while(queue.length&&alive&&AI){
           const q=queue.shift();
           const ok=await aiGrade(q.prompt,q.answer,String(q.given).trim(),q.type==='cz');
           if(ok===true){q.res='ai';q.ok=true;}

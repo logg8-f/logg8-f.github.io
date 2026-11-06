@@ -453,7 +453,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.15.1';
+const APP_VERSION='2.15.2';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -2128,6 +2128,15 @@ function writeEngine(box,cards,o){
       const inp=h('input',{id:'ans',class:'in big',type:'text',autocomplete:'off',autocapitalize:'off',spellcheck:'false','aria-label':'Your answer',
         placeholder:mode==='cloze'?'Fill in the blank':'Type the '+(wd?'definition':'word'),
         onbeforeinput:e=>{if(fb)e.preventDefault();},
+        oninput:()=>{
+          /* Typing again after "very close" means the person is retrying:
+             drop the old prompt and bring the actions back. */
+          if(cur.nearEl){
+            cur.nearEl.remove();cur.nearEl=null;
+            inp.classList.remove('near');
+            if(cur.actions)cur.actions.hidden=false;
+          }
+        },
         onkeydown:e=>{
           if(fb){
             if((e.key==='Enter'||e.key===' '||/^[1-4]$/.test(e.key))&&!e.repeat){e.preventDefault();advance(fb.ok);}
@@ -2216,6 +2225,8 @@ function writeEngine(box,cards,o){
   }
   function finalize(ok,val,revealed,btnEl,aiAccepted){
     if(fb||!cur)return;
+    /* A retry that ends here must not leave the old "very close" prompt behind. */
+    if(cur.nearEl){cur.nearEl.remove();cur.nearEl=null;if(cur.inp)cur.inp.classList.remove('near');}
     const c=cur.c,answer=cur.answer;
     const hinted=ok&&cur.hints>0;
     attempts.set(c.id,(attempts.get(c.id)||0)+1);

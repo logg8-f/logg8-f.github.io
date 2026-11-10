@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Memoria</title><link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/svg+xml" href="favicon.svg"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Memoria</title><link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/svg+xml" href="favicon.svg"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#151A3F"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Familjen+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
 <style>
 /* Layout concept: one calm column, ink-on-paper, with a highlighter-yellow marker used only for "this is active / this is you". */
@@ -443,6 +443,7 @@ select.in{appearance:auto}
 <svg viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-bg" width="32" height="32" rx="7"/><rect class="logo-c1" x="3" y="9" width="20" height="16" rx="3" transform="rotate(-8 13 17)"/><rect class="logo-c2" x="9" y="7" width="20" height="16" rx="3" transform="rotate(4 19 15)"/><rect class="logo-hl" x="13" y="14" width="12" height="4" rx="1" transform="rotate(4 19 16)"/></svg>
 <span>Memoria</span></button>
 <span class="acct" id="acct"></span>
+<button type="button" class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings"></button>
 <span class="ver" id="ver" title="Memoria"></span>
 </div></header>
 <main id="app"></main>
@@ -453,7 +454,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.15.4';
+const APP_VERSION='2.16.0';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -591,11 +592,34 @@ function lev(a,b){
   }
   return d[m][n];
 }
+function numericForm(s){
+  return String(s==null?'':s).toLowerCase().normalize('NFKC')
+    .replace(/[’‘`´ʼ]/g,"'").replace(/\s+/g,' ')
+    .replace(/(?<=\d)[,\s](?=\d{3}(?:\D|$))/g,'')
+    .replace(/(\d),(\d)/g,'$1.$2')
+    .replace(/[.!?;]+$/,'').trim();
+}
+function closeness(given,answer){
+  const g=loose(given);if(!g)return 0;
+  let best=1;
+  variants(answer).forEach(v=>{
+    const max=Math.max(g.length,v.length)||1;
+    best=Math.min(best,lev(g,v)/max);
+  });
+  return Math.max(0,Math.min(100,Math.round((1-best)*100)));
+}
 function judge(given,answer){
   const g=loose(given);
-  if(!g)return{r:'wrong'};
+  if(!g)return{r:'wrong',close:0};
   const vs=variants(answer);
-  if(vs.indexOf(g)!==-1)return{r:'exact'};
+  /* Numbers, dates and units are exact facts, not spelling. A one-character
+     typo may be accepted for a word; it must never turn 1868 into 1968. */
+  if(/\d/.test(plain(answer))){
+    const gn=numericForm(given);
+    if(vs.map(numericForm).indexOf(gn)!==-1)return{r:'exact',close:100};
+    return{r:'wrong',close:closeness(given,answer),numeric:true};
+  }
+  if(vs.indexOf(g)!==-1)return{r:'exact',close:100};
   let best=null;
   vs.forEach(v=>{
     const lim=v.length<=3?0:(v.length<=7?1:2);
@@ -603,7 +627,7 @@ function judge(given,answer){
     const dist=lev(g,v);
     if(dist<=lim&&(best===null||dist<best))best=dist;
   });
-  return best===null?{r:'wrong'}:{r:'near',dist:best};
+  return best===null?{r:'wrong',close:closeness(given,answer)}:{r:'near',dist:best,close:closeness(given,answer)};
 }
 const isLetter=ch=>/[\p{L}\p{N}]/u.test(ch);
 function letterCount(s){return Array.from(String(s)).filter(isLetter).length;}
@@ -671,7 +695,8 @@ const ICON={
   like:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v11H4a1 1 0 01-1-1v-9a1 1 0 011-1h3zM7 10l4.6-7.4a1 1 0 011.7.2c.4 1 .6 2.1.6 3.2V9h4.6a2 2 0 012 2.3l-1.2 7A2 2 0 0117.4 20H7"/></svg>',
   shuffle:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3.5c1.6 0 3 .8 4 2l3 4c1 1.2 2.4 2 4 2H21M18 4l3 3-3 3M3 17h3.5c1.6 0 3-.8 4-2l.6-.8M14.5 9.5l.5-.7c1-1.2 2.4-2 4-2H21M18 20l3-3-3-3"/></svg>',
   globe:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>',
-  export:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M5 21h14"/></svg>'
+  export:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M5 21h14"/></svg>',
+  settings:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6v.2h-4v-.2a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H2.8v-4H3a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 001.9.3A1.7 1.7 0 0010 3V2.8h4V3a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 00-.3 1.9 1.7 1.7 0 001.6 1h.2v4H21a1.7 1.7 0 00-1.6 1z"/></svg>'
 };
 const icon=n=>h('span',{class:'i',html:ICON[n]});
 function btn(label,o){
@@ -811,9 +836,9 @@ function shrink(file){
    Data + storage
    ===================================================================== */
 const KEY='quizlet2.v1',VKEY='quizlet2.view',DKEY='quizlet2.draft';
-let S={decks:[],review:[],images:{},resume:null,profile:{name:''},seeded:true,linked:false};
+let S={decks:[],review:[],srs:{},images:{},resume:null,profile:{name:'',picture:'',theme:'system',reminders:{enabled:false,interval:7,lastSent:0}},seeded:true,linked:false};
 let dirty=false,localLoaded=false,col=null,navs=0,pending=null;
-let DB=null,ME=null,PUB={},VOTES={},pubReady=false,pubHook=null,pubNotice='';
+let DB=null,ME=null,PUB={},VOTES={},REPORTS={decks:{},cards:{}},pubReady=false,pubHook=null,pubNotice='';
 /* Google sign-in. The server decides whether it is on (it holds the OAuth client
    id); the page asks the server. When it is on, publishing and voting need a
    signed-in account, and the account's Google id (USER.sub -> UID) owns the
@@ -913,10 +938,33 @@ async function dbFlush(id){
      instead of dropping it, so a device never silently loses a deck. */
   if(err){
     e.tries=(e.tries||0)+1;
-    if(e.tries<=6){clearTimeout(e.timer);e.timer=setTimeout(()=>dbFlush(id),Math.min(15000,800*e.tries));}
+    /* Keep trying, not just six times: an offline session may last for hours
+       and the local copy is the source of truth until the server returns. */
+    clearTimeout(e.timer);
+    e.timer=setTimeout(()=>dbFlush(id),Math.min(30000,800*Math.max(1,e.tries)));
   }
 }
-const metaDoc=()=>({review:clone(S.review),resume:S.resume?clone(S.resume):null,profile:S.profile?clone(S.profile):{name:''},seeded:true,linked:!!S.linked});
+window.addEventListener('online',()=>{Object.keys(dq).forEach(id=>dbFlush(id));});
+function normProfile(p){
+  p=p&&typeof p==='object'?p:{};
+  const r=p.reminders&&typeof p.reminders==='object'?p.reminders:{};
+  return {name:String(p.name||'').slice(0,40),picture:String(p.picture||''),theme:['system','light','dark'].includes(p.theme)?p.theme:'system',
+    reminders:{enabled:r.enabled===true,interval:[1,3,7,14,30].includes(+r.interval)?+r.interval:7,lastSent:+r.lastSent||0}};
+}
+function applyTheme(){
+  const t=S.profile&&S.profile.theme;
+  if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;
+  else delete document.documentElement.dataset.theme;
+}
+function mergeProfile(a,b){
+  a=normProfile(a);b=normProfile(b);
+  return {name:a.name||b.name,picture:a.picture||b.picture,theme:a.theme&&a.theme!=='system'?a.theme:(b.theme||a.theme),
+    reminders:Object.assign({},b.reminders,a.reminders||{},{
+      enabled:(a.reminders&&a.reminders.enabled)||(b.reminders&&b.reminders.enabled)||false,
+      interval:(a.reminders&&a.reminders.interval)||(b.reminders&&b.reminders.interval)||7,
+      lastSent:Math.max(+((a.reminders||{}).lastSent)||0,+((b.reminders||{}).lastSent)||0)})};
+}
+const metaDoc=()=>({review:clone(S.review),srs:clone(S.srs||{}),resume:S.resume?clone(S.resume):null,profile:S.profile?clone(S.profile):{name:'',picture:'',theme:'system',reminders:{enabled:false,interval:7,lastSent:0}},seeded:true,linked:!!S.linked});
 function touchDeck(d){dirty=true;lsSave();dbQueue('d_'+d.id,clone(d));}
 function touchMeta(){dirty=true;lsSave();dbQueue('meta',metaDoc());}
 function usedImages(){
@@ -935,6 +983,7 @@ function syncImages(fresh){
 function removeDeck(id){
   S.decks=S.decks.filter(d=>d.id!==id);
   S.review=S.review.filter(r=>r.deck!==id);
+  Object.keys(S.srs||{}).forEach(k=>{if(k.indexOf(id+':')===0)delete S.srs[k];});
   dbQueue('d_'+id,null);dbQueue('meta',metaDoc());
   syncImages();
 }
@@ -959,15 +1008,62 @@ function resumeFor(name,id){
   return(r&&r.name===name&&r.id===id&&deckById(id))?r:null;
 }
 
-/* ----- review list: a missed card stays queued until you get it right once ----- */
+/* ----- review list + spaced repetition -----
+   The review list is the manual "you missed this" queue. The SRS schedule is
+   separate: a card can be scheduled in the future and not be in the list. */
+const DAY_MS=24*60*60*1000;
+function srsKey(c){return c.deck.id+':'+c.id;}
+function srsFor(c){
+  const st=S.srs&&S.srs[srsKey(c)];
+  return st&&typeof st==='object'?st:null;
+}
+function srsDue(st){return !st||!st.due||st.due<=Date.now();}
+function srsWhy(c){
+  const st=srsFor(c);
+  if(!st)return 'Not scheduled yet.';
+  if(st.due&&st.due>Date.now()){
+    const d=Math.ceil((st.due-Date.now())/DAY_MS);
+    return 'Scheduled in '+d+(d===1?' day':' days')+' · interval '+st.interval+'d.';
+  }
+  if(st.lastGrade==='wrong')return 'Due now after a miss.';
+  return 'Due now · interval '+Math.max(1,st.interval||1)+'d.';
+}
+function updateSrs(c,ok){
+  const k=srsKey(c),prev=srsFor(c)||{interval:0,ease:2.3,reps:0,lapses:0,due:0,lastGrade:''};
+  const st=Object.assign({},prev);
+  st.reps=+st.reps||0;st.ease=+st.ease||2.3;st.interval=+st.interval||0;
+  if(ok){
+    st.interval=st.reps===0?1:Math.max(1,Math.round(st.interval*st.ease));
+    st.ease=Math.min(2.8,st.ease+0.05);st.reps++;
+    st.lastGrade='right';
+  }else{
+    st.interval=1;st.ease=Math.max(1.3,st.ease-0.2);st.reps=0;st.lapses=(st.lapses||0)+1;
+    st.lastGrade='wrong';
+  }
+  st.due=Date.now()+st.interval*DAY_MS;
+  st.lastAt=Date.now();
+  S.srs[k]=st;touchMeta();
+}
 function markWrong(c){
-  const k=c.deck.id+':'+c.id;
+  const k=srsKey(c);
+  updateSrs(c,false);
   if(!S.review.some(r=>r.k===k)){S.review.push({k,deck:c.deck.id,card:c.id,last:Date.now()});touchMeta();}
 }
 function markRight(c){
-  const k=c.deck.id+':'+c.id,e=S.review.find(r=>r.k===k);
+  const k=srsKey(c),e=S.review.find(r=>r.k===k);
+  updateSrs(c,true);
   if(!e)return;
   S.review=S.review.filter(r=>r!==e);touchMeta();
+}
+function dueItems(){
+  const out=[],now=Date.now();
+  const inReview=new Set(S.review.map(r=>r.k));
+  S.decks.forEach(d=>d.cards.forEach(c=>{
+    const k=d.id+':'+c.id,st=S.srs&&S.srs[k];
+    if(st&&st.due&&st.due<=now)out.push({deck:d,card:c,key:k,e:{}});
+    else if(!st&&inReview.has(k))out.push({deck:d,card:c,key:k,e:{}});
+  }));
+  return out;
 }
 function reviewItems(forDeck){
   const out=[];
@@ -1043,6 +1139,7 @@ function setUser(u){
   USER=(u&&u.sub)?u:null;UID=USER?USER.sub:null;
   try{if(USER)localStorage.setItem(USER_KEY,JSON.stringify(USER));else localStorage.removeItem(USER_KEY);}catch(e){}
   renderAccount();
+  applyTheme();
   if(pubHook)pubChanged();
 }
 async function authApi(what,body){
@@ -1148,7 +1245,8 @@ async function aiGrade(q,a,u,blank){
       body:JSON.stringify({q,a,u,t:blank?'blank':'text'})});
     const j=await r.json().catch(()=>null);
     if(!j||!j.ok){aiOff(j&&j.reason);return null;}
-    const ok=j.correct===true;memoSet(ck,ok);return ok;
+    const out={correct:j.correct===true,why:String(j.why||''),closeness:Math.max(0,Math.min(100,+j.closeness||0))};
+    memoSet(ck,out);return out;
   }catch(e){return null;}
 }
 /* A short AI nudge about the meaning of the answer, or null when unavailable. */
@@ -1200,22 +1298,25 @@ function applyPersonal(remote,mode){
       if(remote.meta.linked)S.linked=true;
       /* A display name set on another device follows the account; a name set on
          this device wins on the first merge so it is not silently overwritten. */
-      if(remote.meta.profile&&remote.meta.profile.name&&!(S.profile&&S.profile.name))S.profile=clone(remote.meta.profile);
+      if(remote.meta.profile)S.profile=mergeProfile(S.profile,remote.meta.profile);
+      if(remote.meta.srs)S.srs=Object.assign({},remote.meta.srs,S.srs||{});
     }
     if(remote){
       const have=new Set(S.decks.map(d=>d.id));
       remote.decks.forEach(d=>{if(!have.has(d.id))S.decks.push(d);});
       const keys=new Set(S.review.map(r=>r.k));
       ((remote.meta&&remote.meta.review)||[]).forEach(r=>{if(!keys.has(r.k))S.review.push(r);});
+      if(remote.meta&&remote.meta.srs)Object.keys(remote.meta.srs).forEach(k=>{if(!S.srs[k])S.srs[k]=remote.meta.srs[k];});
       Object.keys(remote.images).forEach(id=>{if(!S.images[id])S.images[id]=remote.images[id];});
     }
     pushPersonal();
   }else{
     S.decks=remote.decks;
     S.review=(remote.meta&&Array.isArray(remote.meta.review))?remote.meta.review:[];
+    S.srs=(remote.meta&&remote.meta.srs&&typeof remote.meta.srs==='object')?remote.meta.srs:{};
     S.images=remote.images;
     S.resume=(remote.meta&&remote.meta.resume)||null;
-    S.profile=(remote.meta&&remote.meta.profile)||{name:''};
+    S.profile=normProfile(remote.meta&&remote.meta.profile);
     if(remote.meta&&remote.meta.linked)S.linked=true;
   }
 }
@@ -1249,6 +1350,7 @@ async function connectDb(){
       const remote=await readPersonal(c);
       col=c;
       applyPersonal(remote,(dirty||fresh)?'merge':'trust');
+      applyTheme();renderAccount();
       if(UID)markAcctSynced(UID);
     }catch(e){col=null;}
   }else if(AUTH.on){
@@ -1258,6 +1360,7 @@ async function connectDb(){
   if(!S.linked){if(linkBuiltinCopies())hydrateAll();S.linked=true;touchMeta();}
   S.seeded=true;
   startPublic();
+  loadReports();
   pruneReview(true);
   if(!col&&!localLoaded)lsSave();
   if(pending&&navs===0&&(!pending.id||deckById(pending.id))){
@@ -1465,12 +1568,32 @@ function homeView(){
 
   pruneReview(false);
   const items=reviewItems();
+  let deckQ='';
+  const deckList=h('div',{class:'decks'});
+  const deckInfo=h('p',{class:'hint','aria-live':'polite'});
+  function deckMatch(d){
+    const toks=loose(deckQ).split(' ').filter(Boolean);
+    if(!toks.length)return true;
+    const hay=loose(d.title+' '+(d.desc||'')+' '+d.cards.map(c=>plain(c.w||'')+' '+plain(c.d||'')+' '+plain(c.e||'')).join(' '));
+    return toks.every(t=>hay.indexOf(t)>=0);
+  }
+  function paintDecks(){
+    const shown=S.decks.filter(deckMatch);
+    deckList.replaceChildren(...shown.map(deckTile),
+      h('button',{type:'button',class:'deck new',onclick:()=>go('edit')},icon('plus'),h('span',null,'New deck')));
+    deckInfo.textContent=deckQ.trim()?(shown.length?shown.length+(shown.length===1?' deck matches':' decks match')+' “'+deckQ.trim()+'”.':'No deck matches “'+deckQ.trim()+'”.'):'';
+  }
+  const deckSearch=h('input',{type:'search',class:'in',placeholder:'Search your decks, words or definitions',autocomplete:'off','aria-label':'Search your decks',
+    oninput:e=>{deckQ=e.target.value;paintDecks();}});
+  paintDecks();
   const decks=h('section',{class:'sec'},
     h('div',{class:'sec-h'},h('h2',null,'Your decks'),
-      h('button',{type:'button',class:'add-round','aria-label':'Create new deck',title:'Create new deck',onclick:()=>go('edit')},icon('plus'))),
+      h('div',{class:'row'},btn('Import',{cls:'ghost',icon:'plus',onclick:()=>go('import')}),
+        h('button',{type:'button',class:'add-round','aria-label':'Create new deck',title:'Create new deck',onclick:()=>go('edit')},icon('plus')))),
+    S.decks.length?h('div',{class:'toolbar',style:'margin-bottom:14px'},deckSearch):null,
+    deckInfo,
     S.decks.length?null:h('p',{class:'sub',style:'margin-bottom:14px'},'No decks yet. Create your first one, or add one from the public decks.'),
-    h('div',{class:'decks'},S.decks.map(deckTile),
-      h('button',{type:'button',class:'deck new',onclick:()=>go('edit')},icon('plus'),h('span',null,'New deck'))));
+    deckList);
 
   const root=h('div',{class:'wrap view'},hero);
   const rs=S.resume;
@@ -1484,6 +1607,14 @@ function homeView(){
         h('button',{type:'button',class:'icon-btn','aria-label':'Dismiss',title:'Dismiss',onclick:()=>{clearResume();render();}},icon('x')))));
   }
   root.append(decks);
+
+  const due=dueItems();
+  if(due.length){
+    root.append(h('section',{class:'resume'},
+      h('div',{class:'rs-t'},h('p',{class:'eyebrow'},'Spaced repetition'),
+        h('strong',null,due.length+(due.length===1?' card is due':' cards are due')),h('span',{class:'sub'},'Scheduled by your answers.')),
+      h('div',{class:'row'},btn('Review due',{cls:'primary',icon:'write',onclick:()=>go('write',{due:true})}))));
+  }
 
   if(items.length){
     let all=false;
@@ -1598,6 +1729,7 @@ function deckView(p){
   }
   setPubHook(paintPub);paintPub();
   const rv=reviewItems(d.id);
+  const due=dueItems().filter(it=>it.deck.id===d.id);
   const root=h('div',{class:'wrap view'},
     btn('All decks',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
     h('div',{class:'hub-top',oncontextmenu:e=>{e.preventDefault();openDeckSettings(d);}},
@@ -1612,16 +1744,37 @@ function deckView(p){
         btn('Delete',{cls:'ghost',icon:'trash',onclick:askDelete})),
       pubBox,delBox),
     moduleGrid(d,k=>go(k,{id:d.id})),
+    due.length?h('div',{class:'note-row'},
+      h('span',null,h('strong',null,due.length+(due.length===1?' card is':' cards are')),' due for spaced repetition.'),
+      btn('Review due',{cls:'hl',icon:'write',onclick:()=>go('write',{id:d.id,due:true})})):null,
     rv.length?h('div',{class:'note-row'},
       h('span',null,h('strong',null,rv.length+(rv.length===1?' card':' cards')),' from this deck are in your review list.'),
       btn('Review them',{cls:'hl',icon:'write',onclick:()=>go('write',{id:d.id,review:true})})):null,
     statsPanel(d),
-    h('details',{class:'cards-list'},
-      h('summary',null,'Cards in this deck ('+n+')'),
-      h('div',{class:'cl'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
-        d.cards.map(c=>[
-          h('div',null,cimg(c.wi,'cl-img'),rich(c.w)),
-          h('div',null,cimg(c.di,'cl-img'),rich(c.d))]))));
+    (()=>{
+      let q='';
+      const search=h('input',{type:'search',class:'in',placeholder:'Search cards in this deck',autocomplete:'off','aria-label':'Search cards in this deck',
+        oninput:e=>{q=e.target.value;paintCards();}});
+      const box=h('div',{class:'cl'});
+      const count=h('span',{class:'sub mono'});
+      function paintCards(){
+        const toks=loose(q).split(' ').filter(Boolean);
+        const items=d.cards.filter(c=>{
+          if(!toks.length)return true;
+          const hay=loose(plain(c.w||'')+' '+plain(c.d||'')+' '+plain(c.e||''));
+          return toks.every(t=>hay.indexOf(t)>=0);
+        });
+        box.replaceChildren(h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
+          items.map(c=>[
+            h('div',null,cimg(c.wi,'cl-img'),rich(c.w)),
+            h('div',null,cimg(c.di,'cl-img'),rich(c.d),
+              h('button',{type:'button',class:'btn link',style:'padding:2px 0 0;font-size:12px',onclick:()=>go('edit',{id:d.id,focusCard:c.id})},'Edit this card'))]));
+        count.textContent=items.length+(items.length===1?' card':' cards')+(q.trim()?' match':'');
+      }
+      paintCards();
+      return h('div',null,search,h('p',{class:'hint'},count),
+        h('details',{class:'cards-list'},h('summary',null,'Cards in this deck ('+n+')'),box));
+    })());
   return root;
 }
 
@@ -1802,6 +1955,7 @@ function editView(p){
     countEl.textContent=draft.cards.length+(draft.cards.length===1?' card':' cards');
     persist();
     if(focusId){const el=document.getElementById(focusId);if(el)el.focus();}
+    if(p.focusCard){const el=document.getElementById('w-'+p.focusCard);if(el){setTimeout(()=>{el.scrollIntoView({block:'center'});el.focus();},0);}p.focusCard=null;}
   }
   function addAfter(i){const c=blank();draft.cards.splice(i+1,0,c);renderSlots('w-'+c.id);}
   function removeAt(i){
@@ -2147,8 +2301,10 @@ function writeEngine(box,cards,o){
     }
     const area=h('div',{class:'warea'});
     cur={c,wd,answer,mode,opts,area,hints:0,aSide,cl,bi,inp:null,actions:null};
+    const why=o.why?o.why(c):'';
     body.replaceChildren(
       h('div',{class:'wprompt'},h('span',{class:'fc-label'},mode==='cloze'?'Word = definition':(wd?'Word':'Definition')),speakBtn(()=>segs,'corner'),cimg(pImg,'wp-img'),promptEl),
+      why?h('p',{class:'hint',style:'text-align:center'},why):null,
       area);
     if(o.getAuto&&o.getAuto())speakSeq(segs);
     if(mode==='mc'){
@@ -2225,7 +2381,7 @@ function writeEngine(box,cards,o){
     cur.actions.hidden=true;
     const panel=h('div',{class:'fb near',role:'status'},
       h('strong',null,'Very close'),
-      h('p',null,'Off by '+(res.dist===1?'one letter':'a couple of letters')+'. Want to try again?'),
+      h('p',null,'Off by '+(res.dist===1?'one letter':'a couple of letters')+'. Text closeness '+res.close+'% (approximate). Want to try again?'),
       h('div',{class:'row'},
         btn('Try again',{cls:'primary',onclick:()=>{
           panel.remove();cur.nearEl=null;inp.classList.remove('near');cur.actions.hidden=false;inp.focus();inp.select();
@@ -2253,11 +2409,11 @@ function writeEngine(box,cards,o){
       busy=false;
       if(dead||fb||cur!==mine)return;
       note.remove();
-      if(ok===true){finalize(true,val,false,undefined,true);return;}
+      if(ok&&ok.correct===true){finalize(true,val,false,undefined,ok);return;}
     }
     finalize(false,val,false);
   }
-  function finalize(ok,val,revealed,btnEl,aiAccepted){
+  function finalize(ok,val,revealed,btnEl,aiInfo){
     if(fb||!cur)return;
     /* A retry that ends here must not leave the old "very close" prompt behind. */
     if(cur.nearEl){cur.nearEl.remove();cur.nearEl=null;if(cur.inp)cur.inp.classList.remove('near');}
@@ -2280,11 +2436,14 @@ function writeEngine(box,cards,o){
       cur.inp.classList.remove('near');cur.inp.classList.add(ok?'ok':'bad');cur.actions.hidden=true;
     }
     const given=val&&String(val).trim();
+    const aiAccepted=!!(aiInfo&&aiInfo.correct);
+    const pct=!ok&&given?closeness(given,answer):0;
     const head=ok?(hinted?'Correct, with '+cur.hints+(cur.hints===1?' hint':' hints'):(aiAccepted?'Correct — accepted':'Correct')):(revealed||!given?'Here is the answer':'Not quite');
     const panel=h('div',{class:'fb '+(ok?'ok':'bad'),role:'status'},
       h('strong',null,head),
-      ok&&aiAccepted?h('p',null,'The AI accepted your wording as equivalent to the answer.'):null,
+      ok&&aiAccepted?h('p',null,'The AI accepted your wording as equivalent to the answer.'+(aiInfo&&aiInfo.why?' Reason: '+aiInfo.why:'')):null,
       !ok&&given&&cur.mode!=='mc'?h('p',null,'You wrote: ',h('span',{class:'ans-bad'},given)):null,
+      !ok&&given?h('p',{class:'hint'},'Text closeness: '+pct+'% (approximate).'+(aiInfo&&aiInfo.why?' AI: '+aiInfo.why:'')):null,
       !ok?h('p',null,'Answer: ',h('span',{class:'ans-good'},answer)):null,
       ok&&cur.mode!=='mc'?h('p',null,h('span',{class:'ans-good'},answer)):null,
       (c.deck.example&&c.e&&String(c.e).trim())?exLine(c.e):null);
@@ -2360,7 +2519,11 @@ function missList(cards){
 }
 function writeView(p){
   let cards=[],deck=null,title='Write';
-  if(p.id){
+  if(p.due){
+    if(p.id){deck=deckById(p.id);if(!deck)return missing();}
+    title='Due · spaced repetition'+(deck?' · '+deck.title:'');
+    cards=dueItems().filter(it=>!p.id||it.deck.id===p.id).map(it=>sc(it.deck,it.card));
+  }else if(p.id){
     deck=deckById(p.id);if(!deck)return missing();
     title=(p.review?'Review':'Write')+' · '+deck.title;
     cards=p.review?reviewItems(deck.id).map(it=>sc(it.deck,it.card)):deck.cards.map(c=>sc(deck,c));
@@ -2383,7 +2546,7 @@ function writeView(p){
   let firstStart=true;
   function start(list){
     kill();
-    const track=!!deck&&!p.review&&list===cards;
+    const track=!!deck&&!p.review&&!p.due&&list===cards;
     const res=(firstStart&&track&&rs)?rs.data:null;firstStart=false;
     eng=writeEngine(box,list,{
       resume:res,
@@ -2391,6 +2554,7 @@ function writeView(p){
       getDir:()=>cfg.dir,
       getChoize:c=>cfg.choize&&c.deck.choize,
       getAuto:()=>cfg.auto,
+      why:c=>p.due?srsWhy(c):'',
       onDone:r=>{
         eng=null;setKeys(null);
         if(track)clearResume('write',deck.id);
@@ -2739,13 +2903,13 @@ function testView(p){
         while(queue.length&&alive&&AI){
           const q=queue.shift();
           const ok=await aiGrade(q.prompt,q.answer,String(q.given).trim(),q.type==='cz');
-          if(ok===true){q.res='ai';q.ok=true;}
+          if(ok&&ok.correct===true){q.res='ai';q.ok=true;q.aiWhy=ok.why||'';q.aiClose=ok.closeness||0;}
         }
       }
       await Promise.all([worker(),worker(),worker()]);
       if(!alive)return;
     }
-    qs.forEach(q=>{q.ok=q.res!=='wrong';if(q.ok)markRight(q.card);else markWrong(q.card);});
+    qs.forEach(q=>{q.ok=q.res!=='wrong';q.close=(!q.ok&&q.type!=='tf')?closeness(q.given||'',q.answer):0;if(q.ok)markRight(q.card);else markWrong(q.card);});
     const right=qs.filter(q=>q.ok).length;
     const aiN=qs.filter(q=>q.res==='ai').length;
     const pctv=Math.round(right/qs.length*100);
@@ -2769,8 +2933,9 @@ function testView(p){
           h('div',null,q.ok
             ?h('span',null,'Your answer: ',h('strong',null,yours),
               q.res==='near'?h('span',null,' (small typo, spelled ',h('strong',null,correct),')'):null,
-              q.res==='ai'?h('span',null,' (accepted by AI)'):null)
-            :h('span',null,'Your answer: ',h('span',{class:'ans-bad'},yours),h('br'),'Correct: ',h('span',{class:'ans-good'},correct)))));
+              q.res==='ai'?h('span',null,' (accepted by AI'+(q.aiWhy?': '+q.aiWhy:'')+')'):null,
+              q.res==='ai'&&q.aiClose?h('span',null,' · closeness '+q.aiClose+'%'):null)
+            :h('span',null,'Your answer: ',h('span',{class:'ans-bad'},yours),q.close?h('span',null,' · text closeness '+q.close+'%'):null,h('br'),'Correct: ',h('span',{class:'ans-good'},correct)))));
     });
     root.replaceChildren(studyBar('Test · '+deck.title,'Back',back),
       h('div',{style:'max-width:760px;margin:0 auto'},
@@ -2829,9 +2994,11 @@ function pubItems(){
     Object.keys(decks).forEach(k=>{
       const d=decks[k];
       if(!d||!Array.isArray(d.cards)||typeof d.title!=='string')return;
+      const gid=u+'~'+k;
       const cards=d.cards.filter(c=>Array.isArray(c)&&typeof c[0]==='string'&&typeof c[1]==='string').slice(0,500)
-        .map(c=>[String(c[0]),String(c[1]),typeof c[2]==='string'?c[2].slice(0,400):'',
-          typeof c[3]==='string'?c[3]:'',typeof c[4]==='string'?c[4]:'']);
+        .map((c,i)=>[String(c[0]),String(c[1]),typeof c[2]==='string'?c[2].slice(0,400):'',
+          typeof c[3]==='string'?c[3]:'',typeof c[4]==='string'?c[4]:'',i])
+        .filter(c=>reportCardCount(gid,c[5])<3);
       if(!cards.length)return;
       const images={};
       if(d.images&&typeof d.images==='object'&&!Array.isArray(d.images)){
@@ -2843,7 +3010,7 @@ function pubItems(){
       const clean={title:d.title.slice(0,120),desc:typeof d.desc==='string'?d.desc.slice(0,300):'',cards,choize:!!d.choize,example:!!d.example,aiHint:d.aiHint!==false,aiGrade:d.aiGrade!==false,
         images,color:safeColor(d.color),
         langW:typeof d.langW==='string'?d.langW:'',langD:typeof d.langD==='string'?d.langD:'',at:+d.at||0};
-      const gid=u+'~'+k,v=t[gid]||{up:0,down:0};
+      const v=t[gid]||{up:0,down:0};
       out.push({gid,builtin:false,mine:u===UID,key:k,deck:clean,up:v.up,down:v.down,score:v.up-v.down,at:d.at||0});
     });
   });
@@ -2968,6 +3135,195 @@ async function onCredential(resp){
     }
   }catch(e){}
 }
+
+/* =====================================================================
+   Import: Quizlet text/CSV and Anki .apkg (text fields only)
+   ===================================================================== */
+function parseImportText(text){
+  const lines=String(text||'').replace(/\r/g,'').split('\n').filter(l=>l.trim());
+  if(!lines.length)return {pairs:[],skipped:0};
+  const sep=lines[0].includes('\t')?'\t':(lines[0].includes(';')?';':',');
+  function line(s){
+    const out=[];let cur='',q=false;
+    for(let i=0;i<s.length;i++){
+      const ch=s[i];
+      if(ch==='"'){
+        if(q&&s[i+1]==='"'){cur+='"';i++;}
+        else q=!q;
+      }else if(ch===sep&&!q){out.push(cur);cur='';}
+      else cur+=ch;
+    }
+    out.push(cur);return out.map(x=>x.trim());
+  }
+  const pairs=[];let skipped=0;
+  lines.forEach(l=>{
+    if(/^term\s*[\t,;]\s*definition/i.test(l))return;
+    const f=line(l);
+    if(f.length<2||!f[0]||!f[1]){skipped++;return;}
+    pairs.push([f[0],f[1],f[2]||'']);
+  });
+  return {pairs,skipped};
+}
+function importView(){
+  let mode='text',pairs=[],title='Imported deck',busy=false;
+  const msg=h('p',{class:'hint','aria-live':'polite'});
+  const preview=h('div');
+  const titleIn=h('input',{class:'in',type:'text',maxlength:'80',value:title,placeholder:'Deck title',oninput:e=>{title=e.target.value;}});
+  const text=h('textarea',{class:'in mono',rows:'12',placeholder:'Paste Quizlet export, CSV, or one card per line:\nword ; definition ; example'});
+  const file=h('input',{type:'file',accept:'.apkg,.txt,.csv,text/plain,text/csv,application/octet-stream'});
+  const fileWrap=h('div',{class:'field'},h('label',null,'Anki .apkg file'),file);
+  function paint(){
+    preview.replaceChildren();
+    if(pairs.length){
+      preview.append(h('p',{class:'hint'},pairs.length+' cards ready. '+pairs.slice(0,4).map(p=>p[0]+' → '+p[1]).join(' · ')+(pairs.length>4?' …':'')));
+    }
+  }
+  function setMode(v){
+    mode=v;text.hidden=v!=='text';fileWrap.hidden=v!=='anki';fileWrap.style.display=v==='anki'?'grid':'none';pairs=[];paint();
+  }
+  async function parseNow(){
+    msg.textContent='';
+    if(mode==='text'){
+      const r=parseImportText(text.value);
+      pairs=r.pairs;msg.textContent=pairs.length+' cards found'+(r.skipped?' · '+r.skipped+' skipped':'');paint();
+      return;
+    }
+    const f=file.files&&file.files[0];
+    if(!f){msg.textContent='Choose an .apkg file first.';return;}
+    if(f.size>18*1024*1024){msg.textContent='That file is larger than 18 MB.';return;}
+    busy=true;msg.textContent='Reading .apkg…';
+    try{
+      const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]||'');fr.onerror=rej;fr.readAsDataURL(f);});
+      const r=await fetch(API_BASE+'import/anki',{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},body:JSON.stringify({data:b64})});
+      const j=await r.json().catch(()=>null);
+      if(!r.ok||!j||!j.ok){msg.textContent='Could not read that .apkg'+(j&&j.reason?': '+j.reason:'');busy=false;return;}
+      pairs=(j.cards||[]).map(c=>[c[0],c[1],c[2]||'']);
+      msg.textContent=pairs.length+' cards found'+(j.skipped&&j.skipped.empty?' · '+j.skipped.empty+' empty skipped':'')+(j.skipped&&j.skipped.media?' · media not imported':'');
+      paint();
+    }catch(e){msg.textContent='Could not read that .apkg.';}
+    busy=false;
+  }
+  function create(){
+    if(!pairs.length){msg.textContent='Parse a file first.';return;}
+    const d={id:uid(),title:(titleIn.value||'Imported deck').slice(0,80),desc:'Imported '+new Date().toISOString().slice(0,10),choize:true,example:pairs.some(p=>p[2]),color:'',langW:'',langD:'',aiHint:true,aiGrade:true,created:Date.now(),
+      cards:pairs.map(p=>({id:uid(),w:p[0],d:p[1],e:p[2]||''}))};
+    S.decks.push(d);touchDeck(d);go('deck',{id:d.id});
+  }
+  setMode('text');
+  return h('div',{class:'wrap view'},
+    btn('Back',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
+    h('div',{class:'form'},
+      h('h1',null,'Import a deck'),
+      h('p',{class:'sub'},'Move your cards in from Quizlet text/CSV or an Anki .apkg. Only text fields are imported; images and audio are not.'),
+      h('div',{class:'field'},h('label',null,'Format'),seg([['text','Quizlet text / CSV'],['anki','Anki .apkg']],mode,setMode,'Import format')),
+      h('div',{class:'field'},h('label',null,'Deck title'),titleIn),
+      text,fileWrap,
+      h('div',{class:'row'},btn('Preview',{cls:'primary',icon:'next',onclick:parseNow}),btn('Create deck',{cls:'hl',icon:'plus',onclick:create})),
+      preview,msg));
+}
+
+/* =====================================================================
+   Settings: profile, theme, opt-in email reminders, export, deletion
+   ===================================================================== */
+function downloadAllData(){
+  const data={exportedAt:new Date().toISOString(),profile:normProfile(S.profile),decks:S.decks,review:S.review,srs:S.srs,images:S.images};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='memoria-export-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+async function deleteAccountNow(){
+  if(USER){
+    try{
+      const r=await fetch(API_BASE+'account/delete',{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},body:'{}'});
+      const j=await r.json().catch(()=>null);
+      if(!r.ok||!j||!j.ok)return 'Could not schedule deletion. Try again.';
+      const when=j.deleteAt?new Date(j.deleteAt).toLocaleDateString():'30 days from now';
+      try{localStorage.removeItem(KEY);}catch(e){}
+      try{await authApi('logout',{});}catch(e){}
+      setUser(null);
+      setTimeout(()=>{try{location.reload();}catch(e){}},1500);
+      return 'Deletion scheduled for '+when+'. Signing in before then cancels it.';
+    }catch(e){return 'Could not schedule deletion. Try again.';}
+  }
+  try{localStorage.removeItem(KEY);}catch(e){}
+  return 'This device’s Memoria data was removed.';
+}
+function settingsView(){
+  const p=normProfile(S.profile);
+  const msg=h('p',{class:'hint','aria-live':'polite'});
+  const name=h('input',{class:'in',type:'text',maxlength:'40',value:p.name,placeholder:'Your display name',autocomplete:'nickname'});
+  const picPrev=h('span',{class:'acct-av',style:'width:54px;height:54px;font-size:18px'},String((p.name||USER&&USER.email||'?').charAt(0)).toUpperCase());
+  function paintPic(){
+    picPrev.replaceChildren(String((p.name||'?').charAt(0)).toUpperCase());
+    if(p.picture){const im=h('img',{class:'acct-pic',src:p.picture,alt:''});picPrev.append(im);}
+  }
+  paintPic();
+  const picFile=h('input',{type:'file',accept:'image/*',class:'sr-only',tabindex:'-1','aria-hidden':'true'});
+  picFile.addEventListener('change',async()=>{
+    const f=picFile.files&&picFile.files[0];if(!f)return;
+    try{p.picture=await shrink(f);paintPic();msg.textContent='Picture ready. Press Save profile.';}
+    catch(e){msg.textContent='Could not read that image.';}
+  });
+  const saveProfile=()=>{
+    p.name=String(name.value||'').trim().slice(0,40);
+    S.profile=normProfile(Object.assign({},S.profile,p));
+    touchMeta();renderAccount();msg.textContent='Profile saved.';
+  };
+  const theme=seg([['system','System'],['light','Light'],['dark','Dark']],p.theme,v=>{
+    p.theme=v;S.profile=normProfile(Object.assign({},S.profile,{theme:v}));applyTheme();touchMeta();msg.textContent='Theme saved.';
+  },'Theme');
+  const remBox=h('div');
+  function paintReminders(r){
+    remBox.replaceChildren();
+    if(!USER){
+      remBox.append(loginNote('use email reminders'));
+      return;
+    }
+    let enabled=!!r.enabled,interval=+r.interval||7;
+    const info=h('p',{class:'hint'},r.configured?'Email is sent by this server when it is configured.':'Saved, but email sending is not configured on this server.');
+    const select=h('select',{class:'in',onchange:e=>{interval=+e.target.value;}},[[1,'Every day'],[3,'Every 3 days'],[7,'Every week'],[14,'Every 2 weeks'],[30,'Every 30 days']].map(x=>h('option',{value:x[0]},x[1])));
+    select.value=String(interval);
+    const tg=toggle('Email reminders',enabled,on=>{enabled=on;},{});
+    const save=async()=>{
+      try{
+        const res=await fetch(API_BASE+'reminders',{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},body:JSON.stringify({enabled,interval})});
+        const j=await res.json().catch(()=>null);
+        if(!res.ok||!j||!j.ok){info.textContent='Could not save reminders.';return;}
+        S.profile=normProfile(Object.assign({},S.profile,{reminders:{enabled,interval,lastSent:j.lastSent||0}}));
+        touchMeta();info.textContent='Reminder settings saved.';paintReminders(j);
+      }catch(e){info.textContent='Could not save reminders.';}
+    };
+    remBox.append(tg,h('div',{class:'field'},h('label',null,'Interval'),select),h('div',{class:'row'},btn('Save reminders',{cls:'primary',onclick:save})),info,
+      h('p',{class:'hint'},'Off by default. One-click unsubscribe is in every email. No streak, no guilt copy.'));
+  }
+  if(USER){fetch(API_BASE+'reminders',{cache:'no-store'}).then(r=>r.json()).then(j=>paintReminders(j||{})).catch(()=>paintReminders({enabled:false,interval:7}));}
+  else paintReminders({enabled:false,interval:7,configured:false});
+  return h('div',{class:'wrap view'},
+    btn('Back',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
+    h('div',{class:'form'},
+      h('h1',null,'Settings'),
+      h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Profile')),
+        h('div',{class:'row'},picPrev,h('div',{class:'row'},btn('Choose picture',{cls:'ghost',icon:'image',onclick:()=>picFile.click()}),p.picture?btn('Remove',{cls:'ghost',onclick:()=>{p.picture='';paintPic();}}):null),picFile),
+        h('div',{class:'field'},h('label',null,'Display name'),name),
+        h('div',{class:'row'},btn('Save profile',{cls:'primary',onclick:saveProfile})),
+        h('p',{class:'hint'},'Shown in the top corner. The picture is stored in your account settings, not sent to Google.')),
+      h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Appearance')),theme),
+      h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Study reminders')),remBox),
+      h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Data')),
+        h('div',{class:'row'},btn('Export everything',{cls:'ghost',icon:'export',onclick:downloadAllData}),
+          btn(USER?'Delete account':'Delete this device’s data',{cls:'danger',icon:'trash',onclick:async()=>{
+            if(!confirm(USER?'Schedule account deletion in 30 days? You can cancel by signing in before then. Export first if you want a copy.':'Delete Memoria data from this browser? Export first if you want a copy.'))return;
+            msg.textContent='Working…';
+            msg.textContent=await deleteAccountNow();
+            if(!USER){setTimeout(()=>location.reload(),1200);}
+          }})),
+        h('p',{class:'hint'},USER?'Account deletion has a 30-day grace period. There is no human appeal; export is the recourse.':'This removes decks, review history, settings and images from this browser.')),
+      h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Help')),
+        h('p',{class:'sub'},'Memoria has no human support desk. The help is self-service: export your data, read the error message, and try again when the server is reachable. There is no support SLA.')),
+      msg));
+}
 async function signOut(){
   try{await authApi('logout',{});}catch(e){}
   try{if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();}catch(e){}
@@ -2981,8 +3337,9 @@ function acctName(){
 }
 function acctAvatar(name){
   const av=h('span',{class:'acct-av','aria-hidden':'true'},String((name||'?').trim().charAt(0)||'?').toUpperCase());
-  if(USER.picture){
-    const img=h('img',{class:'acct-pic',src:USER.picture,alt:'',referrerpolicy:'no-referrer'});
+  const pic=(S.profile&&S.profile.picture)||USER.picture;
+  if(pic){
+    const img=h('img',{class:'acct-pic',src:pic,alt:'',referrerpolicy:'no-referrer'});
     img.addEventListener('error',()=>img.remove());   // fall back to the initial
     av.append(img);
   }
@@ -3013,7 +3370,7 @@ function renderAccount(){
       btn('Save',{cls:'primary',onclick:()=>saveAcctName(input.value)}),
       (S.profile&&S.profile.name)?btn('Use Google name',{cls:'ghost',onclick:()=>saveAcctName('')}):null),
     h('p',{class:'hint'},'Shown in the top corner on every device signed in to this account.'),
-    h('div',{class:'row'},btn('Sign out',{cls:'link',onclick:signOut})));
+    h('div',{class:'row'},btn('Settings',{cls:'link',onclick:()=>{el.classList.remove('open');go('settings');}}),btn('Sign out',{cls:'link',onclick:signOut})));
   const toggle=h('button',{type:'button',class:'acct-btn','aria-haspopup':'dialog','aria-expanded':'false',title:'Account settings',onclick:()=>{
     const open=el.classList.toggle('open');
     toggle.setAttribute('aria-expanded',String(open));
@@ -3089,7 +3446,45 @@ function loginNote(what){
   kids.push((AUTH.on&&AUTH.clientId)?gsiButton():h('span',{class:'hint'},'Sign-in is not set up on this server.'));
   return h('div',{class:'confirm login',role:'status'},...kids);
 }
-const hidden=it=>!it.builtin&&!it.mine&&it.score<=HIDE_AT;
+const reportDeckCount=gid=>+(((REPORTS.decks||{})[gid]||{}).n)||0;
+const reportCardCount=(gid,i)=>+(((REPORTS.cards||{})[gid+'/'+i]||{}).n)||0;
+const hidden=it=>!it.builtin&&!it.mine&&(it.score<=HIDE_AT||reportDeckCount(it.gid)>=3);
+async function loadReports(){
+  try{
+    const r=await fetch(API_BASE+'reports',{cache:'no-store'});
+    if(!r.ok)return;
+    const j=await r.json();
+    REPORTS={decks:(j&&j.decks)||{},cards:(j&&j.cards)||{}};
+    if(pubHook)pubChanged();
+  }catch(e){}
+}
+async function sendReport(gid,card,reason){
+  try{
+    const r=await fetch(API_BASE+'report',{method:'POST',cache:'no-store',headers:{'content-type':'application/json','x-write-token':writeToken()},
+      body:JSON.stringify({gid,card:card==null?null:card,reason:String(reason||'other')})});
+    const j=await r.json().catch(()=>null);
+    if(!r.ok||!j||!j.ok)return false;
+    await loadReports();
+    return true;
+  }catch(e){return false;}
+}
+function openReport(gid,card,label){
+  const choices=[['wrong','Wrong answer'],['typo','Typo'],['image','Bad image'],['language','Wrong language'],['offensive','Offensive'],['other','Other']];
+  const sel=h('select',{class:'in'},choices.map(([v,t])=>h('option',{value:v},t)));
+  const msg=h('p',{class:'hint','aria-live':'polite'});
+  const back=h('div',{class:'modal-back',onclick:e=>{if(e.target===back)back.remove();}},
+    h('div',{class:'modal',role:'dialog','aria-modal':'true','aria-label':'Report '+label},
+      h('div',{class:'sec-h'},h('h2',null,'Report '+label),h('button',{type:'button',class:'icon-btn','aria-label':'Close',onclick:()=>back.remove()},icon('x'))),
+      h('p',{class:'sub'},'Reports are counted automatically. Three reports on a deck or card hide it from Browse. There is no human review queue.'),
+      h('div',{class:'field'},h('label',null,'Reason'),sel),
+      msg,
+      h('div',{class:'form-actions'},btn('Send report',{cls:'danger',onclick:async()=>{
+        const ok=await sendReport(gid,card,sel.value);
+        msg.textContent=ok?'Report received.':'Could not send the report right now.';
+        if(ok)setTimeout(()=>back.remove(),900);
+      }}),btn('Cancel',{cls:'ghost',onclick:()=>back.remove()}))));
+  document.body.append(back);sel.focus();
+}
 
 function pubTile(it){
   const dc=safeColor(it.deck.color);
@@ -3143,7 +3538,7 @@ function pubDeckView(p){
   const root=h('div',{class:'wrap view'});
   function paint(){
     const it=pubFind(p.id);
-    if(!it){
+    if(!it||hidden(it)){
       if(pubReady){setTimeout(()=>histBack('browse'),0);return;}
       root.replaceChildren(btn('Back',{cls:'link',icon:'back',onclick:()=>histBack('browse')}),h('p',{class:'sub',style:'margin-top:16px'},'Loading…'));
       return;
@@ -3159,7 +3554,8 @@ function pubDeckView(p){
     const rowBtns=h('div',{class:'row'},
       btn(own?'Open my copy':'Add to my decks',{cls:'ghost',icon:own?'next':'plus',onclick:()=>go('deck',{id:ensureCopy(it).id})}),
       (it.mine&&own)?btn('Edit deck',{cls:'ghost',icon:'edit',onclick:()=>go('edit',{id:own.id})}):null,
-      it.mine?btn('Unpublish',{cls:'ghost',icon:'trash',onclick:()=>{unpublishDeck(it.key);histBack('browse');}}):null);
+      it.mine?btn('Unpublish',{cls:'ghost',icon:'trash',onclick:()=>{unpublishDeck(it.key);histBack('browse');}}):null,
+      (!it.builtin&&!it.mine)?btn('Report deck',{cls:'ghost',onclick:()=>openReport(it.gid,null,'deck')}):null);
     root.replaceChildren(...[
       btn('Browse public decks',{cls:'link',icon:'back',onclick:()=>histBack('browse')}),
       h('div',{class:'hub-top'},
@@ -3176,7 +3572,8 @@ function pubDeckView(p){
       h('details',{class:'cards-list'},
         h('summary',null,'Cards in this deck ('+n+')'),
         h('div',{class:'cl'},h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
-          d.cards.slice(0,200).map(c=>[h('div',null,pubCimg(d,c[3],'cl-img'),rich(c[0])),h('div',null,pubCimg(d,c[4],'cl-img'),rich(c[1]))]))),
+          d.cards.slice(0,200).map(c=>[h('div',null,pubCimg(d,c[3],'cl-img'),rich(c[0])),h('div',null,pubCimg(d,c[4],'cl-img'),rich(c[1]),
+            (!it.builtin&&!it.mine&&c[5]!=null)?h('button',{type:'button',class:'btn link',style:'padding:2px 0;font-size:12px',onclick:()=>openReport(it.gid,c[5],'card')},'Report this card'):null)]))),
       n>200?h('p',{class:'hint'},'Showing the first 200 of '+n+' cards.'):null].filter(Boolean));
   }
   setPubHook(paint);
@@ -3187,10 +3584,24 @@ function pubDeckView(p){
 /* =====================================================================
    Views + boot
    ===================================================================== */
-const VIEWS={home:homeView,deck:deckView,edit:editView,export:exportView,flash:flashView,match:matchView,write:writeView,learn:learnView,test:testView,browse:browseView,pubdeck:pubDeckView};
+const VIEWS={home:homeView,deck:deckView,edit:editView,export:exportView,flash:flashView,match:matchView,write:writeView,learn:learnView,test:testView,browse:browseView,pubdeck:pubDeckView,settings:settingsView,import:importView};
 document.getElementById('brand').addEventListener('click',()=>go('home'));
+const settingsBtn=document.getElementById('settings-btn');if(settingsBtn){settingsBtn.append(icon('settings'));settingsBtn.addEventListener('click',()=>go('settings'));}
 
 (function boot(){
+  if('serviceWorker' in navigator){
+    try{navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
+  }
+  function offlineToast(){
+    if(document.getElementById('offline-toast'))return;
+    const el=h('div',{class:'toast',id:'offline-toast',role:'status'},
+      h('span',null,'Offline: your decks are still available. Changes will sync when you reconnect.'),
+      h('button',{type:'button',class:'icon-btn','aria-label':'Dismiss',onclick:()=>el.remove()},icon('x')));
+    document.body.append(el);
+  }
+  window.addEventListener('offline',offlineToast);
+  window.addEventListener('online',()=>{const el=document.getElementById('offline-toast');if(el)el.remove();});
+  if(!navigator.onLine)setTimeout(offlineToast,500);
   /* One-off clean start: a reset token makes this browser throw away decks,
      review history and images cached in localStorage. The profile name stays.
      This runs before the first lsLoad(), so no stale deck is rendered or
@@ -3199,15 +3610,16 @@ document.getElementById('brand').addEventListener('click',()=>go('home'));
     const RKEY='quizlet2.reset';
     if(localStorage.getItem(RKEY)!==DATA_RESET){
       const old=lsLoad();
-      const profile=(old&&old.profile&&typeof old.profile.name==='string')?{name:old.profile.name}:{name:''};
-      localStorage.setItem(KEY,JSON.stringify({decks:[],review:[],images:{},resume:null,profile,seeded:true,linked:!!(old&&old.linked)}));
+      const profile=normProfile(old&&old.profile);
+      localStorage.setItem(KEY,JSON.stringify({decks:[],review:[],srs:{},images:{},resume:null,profile,seeded:true,linked:!!(old&&old.linked)}));
       try{sessionStorage.removeItem(VKEY);sessionStorage.removeItem(DKEY);}catch(e){}
       localStorage.setItem(RKEY,DATA_RESET);
     }
   }catch(e){}
   const loc=lsLoad();
-  if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],images:loc.images||{},resume:loc.resume||null,profile:(loc.profile&&typeof loc.profile.name==='string')?{name:loc.profile.name}:{name:''},seeded:true,linked:!!loc.linked};localLoaded=true;}
-  else S={decks:[],review:[],images:{},resume:null,profile:{name:''},seeded:true,linked:false};
+  if(loc&&Array.isArray(loc.decks)){S={decks:loc.decks,review:Array.isArray(loc.review)?loc.review:[],srs:(loc.srs&&typeof loc.srs==='object')?loc.srs:{},images:loc.images||{},resume:loc.resume||null,profile:normProfile(loc.profile),seeded:true,linked:!!loc.linked};localLoaded=true;}
+  else S={decks:[],review:[],srs:{},images:{},resume:null,profile:normProfile(null),seeded:true,linked:false};
+  applyTheme();
   hydrateAll();
   if(!S.linked){if(linkBuiltinCopies())hydrateAll();S.linked=true;}
   pruneReview(true);

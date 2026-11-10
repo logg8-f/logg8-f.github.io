@@ -20,6 +20,8 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +31,11 @@ const HOST = process.env.HOST || '127.0.0.1'; // only this machine by default; s
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const OWNERS_FILE = path.join(DATA_DIR, 'owners.json'); // path -> the token that owns it
+const REPORTS_FILE = path.join(DATA_DIR, 'reports.json'); // gid / gid/card -> {n,last}
+const DELETIONS_FILE = path.join(DATA_DIR, 'deletions.json'); // sub -> deleteAt
+const REMINDERS_FILE = path.join(DATA_DIR, 'reminders.json'); // sub -> {email,enabled,interval,lastSent,token}
+const RESEND_KEY = String(process.env.RESEND_API_KEY || '').trim();
+const REMINDER_FROM = String(process.env.REMINDER_FROM || 'Memoria <memoria@example.com>').trim();
 
 const MAX_BODY = 2 * 1024 * 1024; // biggest single write we accept (bytes); leaves room for a published deck with shrunk images
 const MAX_DECKS = 15;        // public decks a single publisher may have
@@ -80,6 +87,22 @@ function saveOwners() {
   fs.writeFileSync(tmp, JSON.stringify(owners));
   fs.renameSync(tmp, OWNERS_FILE);
 }
+
+function loadJson(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')) || fallback; }
+  catch { return fallback; }
+}
+function saveJson(file, value) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(value));
+  fs.renameSync(tmp, file);
+}
+let reports = loadJson(REPORTS_FILE, { decks: {}, cards: {} });
+if (!reports.decks) reports.decks = {};
+if (!reports.cards) reports.cards = {};
+let deletions = loadJson(DELETIONS_FILE, {});
+let reminders = loadJson(REMINDERS_FILE, {});
 const tokenOf = req => String(req.headers['x-write-token'] || '').trim();
 /* A visitor's personal area is data/users/<them>/... — their own decks and
    images, not meant to be seen by anyone else. This returns the area key for a
@@ -329,7 +352,8 @@ function clientIp(req) {
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.ico': 'image/x-icon',
   '.woff2': 'font/woff2'
@@ -339,12 +363,13 @@ function json(res, code, obj) {
   res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'content-length': b.length });
   res.end(b);
 }
-function readBody(req) {
+function readBody(req, max) {
+  const limit = max || MAX_BODY;
   return new Promise((resolve, reject) => {
     let n = 0; const parts = [];
     req.on('data', c => {
       n += c.length;
-      if (n > MAX_BODY) { reject(new Error('too large')); req.destroy(); return; }
+      if (n > limit) { reject(new Error('too large')); req.destroy(); return; }
       parts.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(parts).toString('utf8')));
@@ -361,7 +386,7 @@ const AI_SYS = 'You are a lenient but sensible grader for a Swedish vocabulary f
   'phrasing that captures the essential sense, or a different grammatical form all count. Mark ' +
   'it WRONG only if it means something clearly different, is unrelated, or contradicts the ' +
   'accepted answer. Never require the learner to reproduce every part of a longer definition. ' +
-  'Reply only as JSON: {"correct": true} or {"correct": false}.\n' +
+  'Reply only as JSON: {"correct": true, "why": "short reason", "closeness": 0-100} or {"correct": false, "why": "short reason", "closeness": 0-100}. Closeness is an approximate percentage of how close the learner was in meaning.\n' +
   'Examples:\n' +
   '- accepted "tillförlitlig och sakligt trovärdig", learner "trovärdig" -> {"correct": true}\n' +
   '- accepted "göra något mindre betydelsefullt än det är", learner "förminska" -> {"correct": true}\n' +
@@ -392,7 +417,9 @@ async function gradeWithAI(q, a, u, blank) {
     const txt = String(msg.content || '');
     const m = txt.match(/\{[\s\S]*\}/);
     const obj = JSON.parse(m ? m[0] : txt);
-    return obj && obj.correct === true;
+    return {correct: obj && obj.correct === true,
+      why: String((obj && obj.why) || '').slice(0, 160),
+      closeness: Math.max(0, Math.min(100, Number((obj && obj.closeness) || 0)))};
   } catch { return null; }
   finally { clearTimeout(to); }
 }
@@ -488,6 +515,116 @@ function checkPub(data) {
   return null;
 }
 
+/* ---------- account deletion, reports and reminders ---------- */
+function sessionSub(req){const u=sessionUser(req);return u?u.sub:null;}
+function purgeAccount(sub){
+  if(!sub)return;
+  const prefixes=['data/users/'+sub, 'data/users/'+sub+'/', 'pub/'+sub, 'pub/'+sub+'/', 'votes/'+sub];
+  Object.keys(store).forEach(k=>{
+    if(prefixes.some(p=>k===p||k.startsWith(p))) delete store[k];
+  });
+  Object.keys(owners).forEach(k=>{
+    if(prefixes.some(p=>k===p||k.startsWith(p))) delete owners[k];
+  });
+  delete accounts[sub];
+  Object.keys(sessions).forEach(k=>{if(sessions[k]&&sessions[k].sub===sub)delete sessions[k];});
+  delete reminders[sub];
+  save();saveOwners();saveAccounts();saveSessions();saveJson(REMINDERS_FILE,reminders);
+}
+function sweepDeletions(){
+  let changed=false;
+  Object.keys(deletions).forEach(sub=>{
+    const at=+deletions[sub]||0;
+    if(at&&at<=Date.now()){delete deletions[sub];changed=true;purgeAccount(sub);}
+  });
+  if(changed)saveJson(DELETIONS_FILE,deletions);
+}
+function appBase(req){
+  if(process.env.PUBLIC_URL)return String(process.env.PUBLIC_URL).replace(/\/+$/,'');
+  if(!req)return 'http://localhost:'+PORT;
+  const proto=(req.headers['x-forwarded-proto']||'http').split(',')[0].trim();
+  const host=req.headers['x-forwarded-host']||req.headers.host||('localhost:'+PORT);
+  return proto+'://'+host;
+}
+async function sendReminderEmail(req,sub,r){
+  if(!RESEND_KEY||!r.email)return false;
+  const interval=Math.max(1,+r.interval||7);
+  const url=appBase(req)+'/?reminder=1';
+  const unsub=appBase(req)+'/api/reminders/unsubscribe?token='+encodeURIComponent(r.token||'');
+  const body={from:REMINDER_FROM,to:[r.email],subject:'Your Memoria study reminder',
+    text:'You asked Memoria to remind you every '+interval+' days.\n\nStudy: '+url+'\n\nStop these emails: '+unsub+'\n'};
+  try{
+    const res=await fetch('https://api.resend.com/emails',{method:'POST',headers:{authorization:'Bearer '+RESEND_KEY,'content-type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok)return false;
+    r.lastSent=Date.now();r.lastError='';saveJson(REMINDERS_FILE,reminders);return true;
+  }catch(e){r.lastError=String(e.message||e).slice(0,200);saveJson(REMINDERS_FILE,reminders);return false;}
+}
+async function sweepReminders(){
+  const now=Date.now();
+  for(const sub of Object.keys(reminders)){
+    const r=reminders[sub];
+    if(!r||!r.enabled||!r.email)continue;
+    const every=Math.max(1,+r.interval||7)*24*60*60*1000;
+    if(now-(+r.lastSent||0)<every)continue;
+    await sendReminderEmail(null,sub,r); // request-less; PUBLIC_URL recommended for links
+  }
+}
+
+/* ---------- Anki .apkg import ----------
+   .apkg is a zip with a SQLite collection. We use Node's built-in sqlite
+   (experimental in Node 22) and a tiny zip reader, so no npm dependency is
+   needed. Only text fields are imported; media is reported as skipped. */
+function zipEntries(buf){
+  let eocd=-1;
+  for(let i=buf.length-22;i>=Math.max(0,buf.length-65557);i--){
+    if(buf.readUInt32LE(i)===0x06054b50){eocd=i;break;}
+  }
+  if(eocd<0)throw new Error('not a zip');
+  const count=buf.readUInt16LE(eocd+10),off=buf.readUInt32LE(eocd+16);
+  let p=off;const out={};
+  for(let n=0;n<count;n++){
+    if(buf.readUInt32LE(p)!==0x02014b50)break;
+    const method=buf.readUInt16LE(p+10),csize=buf.readUInt32LE(p+20),usize=buf.readUInt32LE(p+24);
+    const nlen=buf.readUInt16LE(p+28),elen=buf.readUInt16LE(p+30),clen=buf.readUInt16LE(p+32);
+    const name=buf.toString('utf8',p+46,p+46+nlen);
+    const local=buf.readUInt32LE(p+42);
+    const lnlen=buf.readUInt16LE(local+26),lelen=buf.readUInt16LE(local+28);
+    const start=local+30+lnlen+lelen;
+    if(usize>25*1024*1024||csize>25*1024*1024)throw new Error('entry too large');
+    out[name]=method===0?buf.subarray(start,start+csize):zlib.inflateRawSync(buf.subarray(start,start+csize));
+    p+=46+nlen+elen+clen;
+  }
+  return out;
+}
+function ankiText(s){
+  return String(s||'').replace(/<br\s*\/?>/gi,'\n').replace(/<\/div>/gi,'\n').replace(/<[^>]+>/g,'')
+    .replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\n{3,}/g,'\n\n').trim();
+}
+async function parseApkg(buf){
+  const files=zipEntries(buf);
+  const name=['collection.anki21','collection.anki2'].find(n=>files[n]);
+  if(!name)throw new Error('no collection in apkg');
+  const tmp=path.join(os.tmpdir(),'memoria-anki-'+crypto.randomBytes(8).toString('hex')+'.db');
+  fs.writeFileSync(tmp,files[name]);
+  try{
+    const {DatabaseSync}=await import('node:sqlite');
+    const db=new DatabaseSync(tmp);
+    const rows=db.prepare('select flds from notes').all();
+    db.close();
+    const cards=[],skipped={empty:0,media:0};
+    for(const r of rows){
+      const f=String(r.flds||'').split('\x1f');
+      const w=ankiText(f[0]||''),d=ankiText(f[1]||''),e=ankiText(f[2]||'');
+      if(!w||!d){skipped.empty++;continue;}
+      cards.push([w,d,e]);
+      if(cards.length>=5000)break;
+    }
+    if(files['media']||files['0'])skipped.media=1;
+    return {cards:cards.slice(0,5000),skipped,total:rows.length};
+  }finally{try{fs.unlinkSync(tmp);}catch{}}
+}
+
 /* ---------- server ---------- */
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
@@ -510,7 +647,8 @@ const server = http.createServer(async (req, res) => {
         const u = sessionUser(req);
         return json(res, 200, {
           auth: !!GOOGLE_CLIENT_ID, clientId: GOOGLE_CLIENT_ID || '',
-          user: u ? { sub: u.sub, email: u.email, name: u.name, picture: u.picture } : null
+          user: u ? { sub: u.sub, email: u.email, name: u.name, picture: u.picture } : null,
+          deletionAt: u && deletions[u.sub] ? deletions[u.sub] : null
         });
       }
 
@@ -523,6 +661,9 @@ const server = http.createServer(async (req, res) => {
         catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
         const info = await verifyGoogleIdToken(body && body.credential);
         if (!info) return json(res, 401, { ok: false, reason: 'invalid token' });
+        // Signing in during the 30-day grace period cancels a pending deletion.
+        const deletionCanceled=!!deletions[info.sub];
+        if(deletionCanceled){delete deletions[info.sub];saveJson(DELETIONS_FILE,deletions);}
         // Remember this account so its personal area (data/users/<sub>/...) is
         // owned by the account and follows the person between devices.
         if (!accounts[info.sub]) { accounts[info.sub] = Date.now(); saveAccounts(); }
@@ -530,7 +671,7 @@ const server = http.createServer(async (req, res) => {
         sessions[sid] = { sub: info.sub, email: info.email, name: info.name, picture: info.picture, iat: Date.now(), exp: Date.now() + SESSION_MS };
         saveSessions();
         res.setHeader('set-cookie', sessionCookie(sid, Math.floor(SESSION_MS / 1000), isHttps(req)));
-        return json(res, 200, { ok: true, user: { sub: info.sub, email: info.email, name: info.name, picture: info.picture } });
+        return json(res, 200, { ok: true, deletionCanceled, user: { sub: info.sub, email: info.email, name: info.name, picture: info.picture } });
       }
 
       if (what === 'logout' && req.method === 'POST') {
@@ -541,6 +682,102 @@ const server = http.createServer(async (req, res) => {
       }
 
       return json(res, 404, { error: 'no route' });
+    }
+
+    /* ---- reports: automated only; no human queue ---- */
+    if (kind === 'report' && req.method === 'POST') {
+      if (tooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+      let body;
+      try { body = JSON.parse(await readBody(req)); }
+      catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
+      const gid = String((body && body.gid) || '').trim().slice(0, 120);
+      const card = body && body.card != null ? Math.max(0, Math.min(500, +body.card || 0)) : null;
+      const reason = String((body && body.reason) || 'other').slice(0, 40);
+      const gidParts = gid.split('~');
+      const pubDoc = gidParts.length === 2 ? store['pub/' + gidParts[0]] : null;
+      if (!gid || gidParts.length !== 2 || !pubDoc || !pubDoc.decks || !pubDoc.decks[gidParts[1]]) {
+        return json(res, 404, { ok: false, reason: 'unknown deck' });
+      }
+      const key = card == null ? gid : gid + '/' + card;
+      const bucket = card == null ? reports.decks : reports.cards;
+      const e = bucket[key] || (bucket[key] = { n: 0, last: 0, by: {}, reasons: {} });
+      const who = crypto.createHash('sha256').update(tokenOf(req) || ip).digest('hex').slice(0, 24);
+      if (!e.by[who]) {
+        e.n = (+e.n || 0) + 1;
+        e.by[who] = Date.now();
+        e.last = Date.now();
+        e.reasons[reason] = (+e.reasons[reason] || 0) + 1;
+        saveJson(REPORTS_FILE, reports);
+      }
+      return json(res, 200, { ok: true, n: e.n, hidden: e.n >= 3 });
+    }
+    if (kind === 'reports' && req.method === 'GET') {
+      const publicBucket = b => Object.fromEntries(Object.entries(b || {}).map(([k, v]) => [k, { n: +v.n || 0, last: +v.last || 0 }]));
+      return json(res, 200, { decks: publicBucket(reports.decks), cards: publicBucket(reports.cards) });
+    }
+
+    /* ---- account deletion: 30-day grace; no human appeal ---- */
+    if (kind === 'account' && parts[2] === 'delete' && req.method === 'POST') {
+      const sub = sessionSub(req);
+      if (!sub) return json(res, 401, { ok: false, reason: 'sign in first' });
+      if (tooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+      const deleteAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      deletions[sub] = deleteAt;saveJson(DELETIONS_FILE, deletions);
+      return json(res, 200, { ok: true, deleteAt });
+    }
+    if (kind === 'account' && parts[2] === 'deletion' && req.method === 'GET') {
+      const sub = sessionSub(req);
+      return json(res, 200, { ok: true, deleteAt: sub ? (deletions[sub] || null) : null });
+    }
+
+    /* ---- opt-in email reminders (default off) ---- */
+    if (kind === 'reminders' && parts[2] === 'unsubscribe' && req.method === 'GET') {
+      const token = String(u.searchParams.get('token') || '');
+      let hit = null;
+      Object.keys(reminders).forEach(sub => { if (reminders[sub] && reminders[sub].token === token) hit = sub; });
+      if (hit) { reminders[hit].enabled = false; saveJson(REMINDERS_FILE, reminders); }
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end('<!doctype html><meta name="viewport" content="width=device-width"><p style="font:16px system-ui;padding:40px">Reminder emails are off. You can turn them back on in Memoria settings.</p>');
+    }
+    if (kind === 'reminders') {
+      const u2 = sessionUser(req);
+      if (!u2) return json(res, 401, { ok: false, reason: 'sign in first' });
+      if (req.method === 'GET') {
+        const r = reminders[u2.sub] || { enabled: false, interval: 7, lastSent: 0 };
+        return json(res, 200, { ok: true, enabled: !!r.enabled, interval: +r.interval || 7, lastSent: +r.lastSent || 0, configured: !!RESEND_KEY });
+      }
+      if (req.method === 'POST') {
+        if (tooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+        let body;
+        try { body = JSON.parse(await readBody(req)); }
+        catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
+        const enabled = !!(body && body.enabled);
+        const interval = [1, 3, 7, 14, 30].includes(+((body || {}).interval)) ? +body.interval : 7;
+        const r = reminders[u2.sub] || { token: randId(), lastSent: 0 };
+        r.email = u2.email || r.email || '';
+        r.enabled = enabled;
+        r.interval = interval;
+        if (!r.token) r.token = randId();
+        reminders[u2.sub] = r;saveJson(REMINDERS_FILE, reminders);
+        return json(res, 200, { ok: true, enabled, interval, configured: !!RESEND_KEY });
+      }
+      return json(res, 405, { ok: false, reason: 'method' });
+    }
+
+    /* ---- Anki .apkg import (text fields only) ---- */
+    if (kind === 'import' && parts[2] === 'anki' && req.method === 'POST') {
+      if (tooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+      let body;
+      try { body = JSON.parse(await readBody(req, 30 * 1024 * 1024)); }
+      catch { return json(res, 400, { ok: false, reason: 'file too large or bad body' }); }
+      const b64 = String((body && body.data) || '');
+      if (!b64 || b64.length > 28 * 1024 * 1024) return json(res, 400, { ok: false, reason: 'file too large' });
+      try {
+        const out = await parseApkg(Buffer.from(b64, 'base64'));
+        return json(res, 200, { ok: true, cards: out.cards, skipped: out.skipped, total: out.total });
+      } catch (e) {
+        return json(res, 400, { ok: false, reason: String(e.message || 'could not read apkg').slice(0, 120) });
+      }
     }
 
     if (kind === 'stream' && req.method === 'GET') {
@@ -571,7 +808,7 @@ const server = http.createServer(async (req, res) => {
         if (verdict !== null) aiCacheSet(ck, verdict);
       }
       if (verdict === null) return json(res, 200, { ok: false, reason: 'unavailable' });
-      return json(res, 200, { ok: true, correct: verdict });
+      return json(res, 200, { ok: true, correct: !!verdict.correct, why: verdict.why || '', closeness: verdict.closeness || 0 });
     }
 
     // one semantic hint for a card: POST /api/hint {q,a}
@@ -699,6 +936,10 @@ const server = http.createServer(async (req, res) => {
     res.end(req.method === 'HEAD' ? undefined : buf);
   });
 });
+
+sweepDeletions();
+setInterval(sweepDeletions, 60 * 60 * 1000);
+setInterval(sweepReminders, 60 * 60 * 1000);
 
 server.listen(PORT, HOST, () => {
   console.log('Memoria server running');

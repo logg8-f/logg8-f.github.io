@@ -256,3 +256,41 @@ then add `EnvironmentFile=/etc/quizlet.env` to `quizlet.service` and reload:
 sudo systemctl daemon-reload && sudo systemctl restart quizlet
 ```
 
+
+## Settings, reminders and deletion
+
+The **Settings** page (gear in the header) has profile name/picture, light/dark/system
+theme, opt-in study reminders, export-everything and account deletion.
+
+Email reminders are **off by default**. The server stores the preference and sends
+only when these environment variables are set:
+
+```
+RESEND_API_KEY=re_...
+REMINDER_FROM=Memoria <memoria@your-domain.example>
+PUBLIC_URL=https://your-domain.example
+```
+
+`PUBLIC_URL` is used in the reminder and unsubscribe links. If it is missing, the
+links fall back to the request host (or `localhost` for the hourly background job).
+The server checks reminders once an hour; the user chooses the interval (1, 3, 7, 14
+or 30 days) and every email has a one-click unsubscribe.
+
+Account deletion is self-serve and has a **30-day grace period**; signing in during
+that window cancels it. The server purges the personal area, published decks, votes,
+sessions and reminder record when the grace period ends. There is no human appeal
+queue and no support SLA.
+
+## Offline / PWA
+
+`sw.js` caches the app shell so the app opens without a network. Decks, review state
+and SRS state are in localStorage, so all five study modes work offline. API calls are
+never cached; failed writes stay local and retry when the connection returns. The
+service worker is registered from the page; a new deploy should bump the `CACHE`
+name in `sw.js`.
+
+## Importing an Anki deck
+
+The import screen accepts Quizlet text/CSV and Anki `.apkg`. `.apkg` support uses
+Node's built-in `node:sqlite` (Node 22+) and a small zip reader, so there is no npm
+dependency. Only text fields are imported; Anki media is reported as skipped.

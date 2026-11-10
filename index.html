@@ -165,11 +165,15 @@ details.cards-list summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .form{max-width:780px;display:grid;gap:22px}
 .settings-form{max-width:760px;gap:0}
 .settings-form>h1{margin-bottom:10px}
-.settings-form .sec{margin-top:26px}
-.settings-form .sec:first-of-type{margin-top:8px}
-.settings-form .sec-h{margin-bottom:10px}
-.settings-form .field{margin-top:10px}
-.settings-form .hint{margin-top:2px}
+.settings-form .sec{margin-top:24px}
+.settings-form .sec:first-of-type{margin-top:6px}
+.settings-form .sec-h{margin-bottom:8px}
+.settings-form .field{margin-top:8px}
+.settings-form .field + .row,
+.settings-form .row + .field,
+.settings-form .row + .row{margin-top:8px}
+.settings-form .hint{margin-top:4px}
+.settings-form .row{gap:8px}
 .form h1{font-size:clamp(1.8rem,5vw,2.4rem)}
 .field{display:grid;gap:7px}
 .field>label,.lbl{font-weight:600;font-size:14px}
@@ -461,7 +465,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.16.1';
+const APP_VERSION='2.16.2';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -852,7 +856,7 @@ let DB=null,ME=null,PUB={},VOTES={},REPORTS={decks:{},cards:{}},pubReady=false,p
    user's public decks and votes. Personal decks stay private to this browser and
    never require signing in. */
 let AUTH={on:false,clientId:''};
-let USER=null,UID=null;
+let USER=null,UID=null,settingsAuthPaint=null;
 
 /* Built-in public decks: [id, title, description, langW, langD, choize, cards]. Choize decks use {curly brackets} in the definition. */
 const BUILTIN=[
@@ -1147,6 +1151,7 @@ function setUser(u){
   try{if(USER)localStorage.setItem(USER_KEY,JSON.stringify(USER));else localStorage.removeItem(USER_KEY);}catch(e){}
   renderAccount();
   applyTheme();
+  if(settingsAuthPaint){try{settingsAuthPaint();}catch(e){}}
   if(pubHook)pubChanged();
 }
 async function authApi(what,body){
@@ -3308,8 +3313,16 @@ function settingsView(){
     remBox.append(tg,h('div',{class:'field'},h('label',null,'Interval'),select),h('div',{class:'row'},btn('Save reminders',{cls:'primary',onclick:save})),info,
       h('p',{class:'hint'},'Off by default. One-click unsubscribe is in every email. No streak, no guilt copy.'));
   }
-  if(USER){fetch(API_BASE+'reminders',{cache:'no-store'}).then(r=>r.json()).then(j=>paintReminders(j||{})).catch(()=>paintReminders({enabled:false,interval:7}));}
-  else paintReminders({enabled:false,interval:7,configured:false});
+  function refreshReminders(){
+    if(!USER){
+      if(AUTH.on){remBox.replaceChildren(h('p',{class:'hint'},'Checking sign-in…'));return;}
+      paintReminders({enabled:false,interval:7,configured:false});return;
+    }
+    fetch(API_BASE+'reminders',{cache:'no-store'}).then(r=>r.json()).then(j=>paintReminders(j||{})).catch(()=>paintReminders({enabled:false,interval:7}));
+  }
+  settingsAuthPaint=refreshReminders;
+  onLeave(()=>{if(settingsAuthPaint===refreshReminders)settingsAuthPaint=null;});
+  refreshReminders();
   return h('div',{class:'wrap view'},
     btn('Back',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
     h('div',{class:'form settings-form'},

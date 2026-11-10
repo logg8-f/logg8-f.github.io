@@ -163,6 +163,13 @@ details.cards-list summary{padding:14px 16px;font-weight:600;cursor:pointer}
 
 /* forms */
 .form{max-width:780px;display:grid;gap:22px}
+.settings-form{max-width:760px;gap:0}
+.settings-form>h1{margin-bottom:10px}
+.settings-form .sec{margin-top:26px}
+.settings-form .sec:first-of-type{margin-top:8px}
+.settings-form .sec-h{margin-bottom:10px}
+.settings-form .field{margin-top:10px}
+.settings-form .hint{margin-top:2px}
 .form h1{font-size:clamp(1.8rem,5vw,2.4rem)}
 .field{display:grid;gap:7px}
 .field>label,.lbl{font-weight:600;font-size:14px}
@@ -454,7 +461,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.16.0';
+const APP_VERSION='2.16.1';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -3252,9 +3259,12 @@ async function deleteAccountNow(){
 }
 function settingsView(){
   const p=normProfile(S.profile);
+  const googleName=USER?String(USER.name||USER.email||''):'';
+  if(!p.name)p.name=googleName;
+  if(!p.picture&&USER&&USER.picture)p.picture=USER.picture;
   const msg=h('p',{class:'hint','aria-live':'polite'});
   const name=h('input',{class:'in',type:'text',maxlength:'40',value:p.name,placeholder:'Your display name',autocomplete:'nickname'});
-  const picPrev=h('span',{class:'acct-av',style:'width:54px;height:54px;font-size:18px'},String((p.name||USER&&USER.email||'?').charAt(0)).toUpperCase());
+  const picPrev=h('span',{class:'acct-av',style:'width:54px;height:54px;font-size:18px'},String((p.name||'?').charAt(0)).toUpperCase());
   function paintPic(){
     picPrev.replaceChildren(String((p.name||'?').charAt(0)).toUpperCase());
     if(p.picture){const im=h('img',{class:'acct-pic',src:p.picture,alt:''});picPrev.append(im);}
@@ -3302,7 +3312,7 @@ function settingsView(){
   else paintReminders({enabled:false,interval:7,configured:false});
   return h('div',{class:'wrap view'},
     btn('Back',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
-    h('div',{class:'form'},
+    h('div',{class:'form settings-form'},
       h('h1',null,'Settings'),
       h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Profile')),
         h('div',{class:'row'},picPrev,h('div',{class:'row'},btn('Choose picture',{cls:'ghost',icon:'image',onclick:()=>picFile.click()}),p.picture?btn('Remove',{cls:'ghost',onclick:()=>{p.picture='';paintPic();}}):null),picFile),

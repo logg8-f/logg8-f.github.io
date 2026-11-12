@@ -42,6 +42,10 @@ Everything people publish goes into **`data/db.json`**, and a small companion
 file **`data/owners.json`** records the secret key each document belongs to (see
 "What keeps it from being abused"). The second file protects the first.
 
+Bug reports sent from **Settings → Report a bug** are appended to
+**`data/bug-reports.txt`**, one timestamped block per report. They are plain
+text and are not sent anywhere else.
+
 - To back them up, copy the whole `data/` folder.
 - To wipe everything and start fresh, delete the `data/` folder.
 - Neither is uploaded to GitHub (see `.gitignore`).

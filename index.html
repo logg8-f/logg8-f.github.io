@@ -101,6 +101,7 @@ button:disabled{cursor:not-allowed}
 
 /* views */
 .view{padding-block:28px 80px;animation:rise .25s ease both}
+.view.flash,.view.match{padding-bottom:8px}
 @keyframes rise{from{transform:translateY(5px)}to{transform:none}}
 .eyebrow{font:500 12px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
 .sec{margin-top:48px}
@@ -154,6 +155,7 @@ button:disabled{cursor:not-allowed}
 .fn p{color:var(--ink-2);font-size:14px}
 .fn:disabled{opacity:.55}
 .note-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:16px;padding:14px 16px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface)}
+.deck-cards{margin-top:24px}
 details.cards-list{margin-top:28px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface)}
 details.cards-list summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .cl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:6px 20px;padding:0 16px 16px}
@@ -232,9 +234,11 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 /* study shell */
 .sbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:22px}
 .sbar-t{font-size:1.1rem;text-align:center}
+.sbar-mid{display:flex;align-items:center;justify-content:center;gap:16px;min-width:0}
+.mstats{display:flex;align-items:center;gap:14px;font:500 12.5px var(--f-mono);color:var(--ink-2);white-space:nowrap}
 .sbar .btn.link{justify-self:start}
-@media (max-width:520px){.sbar{grid-template-columns:auto 1fr}.sbar>:last-child{display:none}.sbar-t{text-align:right}}
-.opts{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;justify-content:center;margin-top:22px}
+@media (max-width:520px){.sbar{grid-template-columns:auto 1fr}.sbar>:last-child{display:none}.sbar-t{text-align:right}.sbar-mid{justify-content:flex-end;flex-wrap:wrap;gap:4px 12px}.mstats{font-size:11.5px;gap:10px}}
+.opts{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;justify-content:center;margin-top:16px}
 .seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
 .seg button{border:0;background:transparent;padding:8px 14px;font-weight:600;font-size:14px}
 .seg button[aria-pressed="true"]{background:var(--hl);color:var(--on-hl)}
@@ -246,12 +250,12 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .center-hint{text-align:center;font-size:13px;color:var(--ink-2);margin-top:14px}
 
 /* flashcards */
-.fc-stage{max-width:720px;margin:0 auto;touch-action:pan-y;user-select:none;-webkit-user-select:none}
-.fc{width:100%;aspect-ratio:3/2;min-height:230px;cursor:pointer;display:block}
+.fc-stage{max-width:640px;margin:0 auto;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.fc{width:100%;height:min(42vh,420px);min-height:190px;cursor:pointer;display:block}
 .fc-inner{position:relative;width:100%;height:100%;}
 .fc-inner.turn{animation:turn .3s ease}
 @keyframes turn{0%{transform:scaleX(1)}50%{transform:scaleX(.02)}100%{transform:scaleX(1)}}
-.fc-face{position:absolute;inset:0;border-radius:22px;background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--shadow);display:grid;place-items:center;padding:34px 26px 26px;text-align:center;overflow:hidden}
+.fc-face{position:absolute;inset:0;border-radius:22px;background:var(--surface);border:1.5px solid var(--ink);box-shadow:var(--shadow);display:grid;place-items:center;padding:28px 22px 22px;text-align:center;overflow:hidden}
 .fc-face.back{background:var(--surface-2)}
 .fc-label{position:absolute;top:14px;left:18px;font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
 .fc-text{font:600 clamp(1.6rem,5vw,2.6rem)/1.15 var(--f-display);overflow-wrap:anywhere;letter-spacing:-.01em}
@@ -262,7 +266,7 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .fc-stage.in-prev .fc{animation:slideL .22s ease both}
 @keyframes slideR{from{transform:translateX(26px)}to{transform:none}}
 @keyframes slideL{from{transform:translateX(-26px)}to{transform:none}}
-.fc-nav{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:22px}
+.fc-nav{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:16px}
 .fc:focus,.fc:focus-visible{outline:none}
 .count{font:500 15px var(--f-mono);min-width:70px;text-align:center}
 
@@ -465,7 +469,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.16.2';
+const APP_VERSION='2.16.3';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -1446,8 +1450,9 @@ function missing(){
   view={name:'home'};saveView();
   return homeView();
 }
-function studyBar(title,backLabel,backFn){
-  return h('div',{class:'sbar'},btn(backLabel,{cls:'link',icon:'back',onclick:backFn}),h('h1',{class:'sbar-t'},title),h('span'));
+function studyBar(title,backLabel,backFn,extra){
+  const mid=extra?h('div',{class:'sbar-mid'},h('h1',{class:'sbar-t'},title),extra):h('h1',{class:'sbar-t'},title);
+  return h('div',{class:'sbar'},btn(backLabel,{cls:'link',icon:'back',onclick:backFn}),mid,h('span'));
 }
 function clozeNode(parts,hide,answerLen){
   const f=document.createDocumentFragment();
@@ -1745,10 +1750,9 @@ function deckView(p){
   const root=h('div',{class:'wrap view'},
     btn('All decks',{cls:'link',icon:'back',onclick:()=>histBack('home')}),
     h('div',{class:'hub-top',oncontextmenu:e=>{e.preventDefault();openDeckSettings(d);}},
-      d.example?h('span',{class:'tag',style:'justify-self:start'},'Example'):null,
       h('h1',null,d.title),
       d.desc?h('p',{class:'desc'},d.desc):null,
-      h('div',{class:'chips'},h('span',{class:'tag'},n+(n===1?' card':' cards')),h('span',{class:'tag'},'Blanks '+(d.choize?'on':'off')),d.src?h('span',{class:'tag hl'},'Linked built-in'):null),
+      h('div',{class:'chips'},h('span',{class:'tag'},n+(n===1?' card':' cards')),d.src?h('span',{class:'tag hl'},'Linked built-in'):null),
       h('div',{class:'row'},
         btn('Edit deck',{cls:'ghost',icon:'edit',onclick:()=>go('edit',{id:d.id})}),
         btn('Export',{cls:'ghost',icon:'export',onclick:()=>go('export',{id:d.id})}),
@@ -1777,14 +1781,14 @@ function deckView(p){
           return toks.every(t=>hay.indexOf(t)>=0);
         });
         box.replaceChildren(h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
-          items.map(c=>[
+          ...items.flatMap(c=>[
             h('div',null,cimg(c.wi,'cl-img'),rich(c.w)),
             h('div',null,cimg(c.di,'cl-img'),rich(c.d),
               h('button',{type:'button',class:'btn link',style:'padding:2px 0 0;font-size:12px',onclick:()=>go('edit',{id:d.id,focusCard:c.id})},'Edit this card'))]));
         count.textContent=items.length+(items.length===1?' card':' cards')+(q.trim()?' match':'');
       }
       paintCards();
-      return h('div',null,search,h('p',{class:'hint'},count),
+      return h('div',{class:'deck-cards'},search,h('p',{class:'hint'},count),
         h('details',{class:'cards-list'},h('summary',null,'Cards in this deck ('+n+')'),box));
     })());
   return root;
@@ -2150,7 +2154,7 @@ function flashView(p){
     shufBtn,
     TTS?toggle('Read aloud automatically',false,on=>{auto=on;if(on)say();else stopSpeech();}):null);
   show(i0);
-  return h('div',{class:'wrap view'},
+  return h('div',{class:'wrap view flash'},
     studyBar('Flashcards · '+deck.title,'Back',()=>histBack('deck',{id:deck.id})),
     stage,
     h('div',{class:'fc-nav'},prev,h('div',{class:'cnt-wrap'},cnt,spk),next),
@@ -2170,11 +2174,13 @@ function matchEngine(box,cards,o){
   const t0=Date.now(),mistakes=new Set();
   const roundEl=h('span'),missEl=h('span'),timeEl=h('span',{class:'mono'},'0:00');
   const bestEl=o.best!=null?h('span',{class:'mono'},'Best '+fmt(o.best)):null;
+  const stats=o.stats||h('div',{class:'mbar'});
+  stats.replaceChildren(...[roundEl,missEl,bestEl,timeEl].filter(Boolean));
   const listL=h('div',{class:'mlist'}),listR=h('div',{class:'mlist'});
   const grid=h('div',{class:'mgrid'},
     h('div',{class:'mcol'},h('p',{class:'mcol-h'},'Words'),listL),
     h('div',{class:'mcol'},h('p',{class:'mcol-h'},'Definitions'),listR));
-  box.replaceChildren(h('div',{class:'mbar'},roundEl,missEl,bestEl,timeEl),grid);
+  box.replaceChildren(grid);
   const tick=setInterval(()=>{timeEl.textContent=fmt(Date.now()-t0);},250);
   function start(){
     const r=rounds[ri];
@@ -2241,14 +2247,15 @@ function matchView(p){
   const deck=deckById(p.id);if(!deck)return missing();
   const cards=deck.cards.map(c=>sc(deck,c));
   const box=h('div');
+  const stats=h('div',{class:'mstats'});
   let eng=null;
   function kill(){if(eng){eng.destroy();eng=null;}setKeys(null);}
   onLeave(kill);
   function play(){
     kill();
     const best=deck.stats&&deck.stats.matchBest!=null?deck.stats.matchBest:null;
-    eng=matchEngine(box,cards,{best,onDone:r=>{
-      eng=null;setKeys(null);
+    eng=matchEngine(box,cards,{best,stats,onDone:r=>{
+      eng=null;setKeys(null);stats.replaceChildren();
       const rec=recordMatch(deck,r.ms);
       box.replaceChildren(h('div',{class:'result'},
         h('p',{class:'eyebrow'},rec.isBest&&rec.prev!==null?'New personal best':'All matched'),
@@ -2261,10 +2268,9 @@ function matchView(p){
     setKeys(eng.onKey);
   }
   play();
-  return h('div',{class:'wrap view'},
-    studyBar('Match · '+deck.title,'Back',()=>histBack('deck',{id:deck.id})),
-    box,
-    h('p',{class:'center-hint desk-only'},'Press the number on a tile to select it.'));
+  return h('div',{class:'wrap view match'},
+    studyBar('Match · '+deck.title,'Back',()=>histBack('deck',{id:deck.id}),stats),
+    box);
 }
 
 /* =====================================================================
@@ -2314,10 +2320,10 @@ function writeEngine(box,cards,o){
     const area=h('div',{class:'warea'});
     cur={c,wd,answer,mode,opts,area,hints:0,aSide,cl,bi,inp:null,actions:null};
     const why=o.why?o.why(c):'';
-    body.replaceChildren(
+    body.replaceChildren(...[
       h('div',{class:'wprompt'},h('span',{class:'fc-label'},mode==='cloze'?'Word = definition':(wd?'Word':'Definition')),speakBtn(()=>segs,'corner'),cimg(pImg,'wp-img'),promptEl),
       why?h('p',{class:'hint',style:'text-align:center'},why):null,
-      area);
+      area].filter(Boolean));
     if(o.getAuto&&o.getAuto())speakSeq(segs);
     if(mode==='mc'){
       area.append(h('p',{class:'ask'},'Choose the '+(wd?'definition':'word')),
@@ -3268,6 +3274,20 @@ function settingsView(){
   if(!p.name)p.name=googleName;
   if(!p.picture&&USER&&USER.picture)p.picture=USER.picture;
   const msg=h('p',{class:'hint','aria-live':'polite'});
+  const bugText=h('textarea',{class:'in',rows:'4',maxlength:'2000',placeholder:'What did you do, and what went wrong?'});
+  const bugMsg=h('p',{class:'hint','aria-live':'polite'});
+  async function sendBug(){
+    const text=String(bugText.value||'').trim();
+    if(!text){bugMsg.textContent='Write what happened first.';bugText.focus();return;}
+    bugMsg.textContent='Saving…';
+    try{
+      const r=await fetch(API_BASE+'bug',{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},
+        body:JSON.stringify({message:text,page:view.name+(view.id?'/'+view.id:''),version:APP_VERSION})});
+      const j=await r.json().catch(()=>null);
+      if(!r.ok||!j||!j.ok){bugMsg.textContent='Could not save the report. Try again.';return;}
+      bugText.value='';bugMsg.textContent='Report saved. Thank you.';
+    }catch(e){bugMsg.textContent='Could not save the report. Try again.';}
+  }
   const name=h('input',{class:'in',type:'text',maxlength:'40',value:p.name,placeholder:'Your display name',autocomplete:'nickname'});
   const picPrev=h('span',{class:'acct-av',style:'width:54px;height:54px;font-size:18px'},String((p.name||'?').charAt(0)).toUpperCase());
   function paintPic(){
@@ -3297,20 +3317,20 @@ function settingsView(){
       return;
     }
     let enabled=!!r.enabled,interval=+r.interval||7;
-    const info=h('p',{class:'hint'},r.configured?'Email is sent by this server when it is configured.':'Saved, but email sending is not configured on this server.');
-    const select=h('select',{class:'in',onchange:e=>{interval=+e.target.value;}},[[1,'Every day'],[3,'Every 3 days'],[7,'Every week'],[14,'Every 2 weeks'],[30,'Every 30 days']].map(x=>h('option',{value:x[0]},x[1])));
+    const status=h('p',{class:'hint','aria-live':'polite'});
+    const select=h('select',{class:'in',onchange:e=>{interval=+e.target.value;save();}},[[1,'Every day'],[3,'Every 3 days'],[7,'Every week'],[14,'Every 2 weeks'],[30,'Every 30 days']].map(x=>h('option',{value:x[0]},x[1])));
     select.value=String(interval);
-    const tg=toggle('Email reminders',enabled,on=>{enabled=on;},{});
+    const tg=toggle('Email reminders',enabled,on=>{enabled=on;save();},{});
     const save=async()=>{
       try{
         const res=await fetch(API_BASE+'reminders',{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},body:JSON.stringify({enabled,interval})});
         const j=await res.json().catch(()=>null);
-        if(!res.ok||!j||!j.ok){info.textContent='Could not save reminders.';return;}
+        if(!res.ok||!j||!j.ok){status.textContent='Could not save reminders.';return;}
         S.profile=normProfile(Object.assign({},S.profile,{reminders:{enabled,interval,lastSent:j.lastSent||0}}));
-        touchMeta();info.textContent='Reminder settings saved.';paintReminders(j);
-      }catch(e){info.textContent='Could not save reminders.';}
+        touchMeta();status.textContent='';
+      }catch(e){status.textContent='Could not save reminders.';}
     };
-    remBox.append(tg,h('div',{class:'field'},h('label',null,'Interval'),select),h('div',{class:'row'},btn('Save reminders',{cls:'primary',onclick:save})),info,
+    remBox.append(tg,h('div',{class:'field'},h('label',null,'Interval'),select),status,
       h('p',{class:'hint'},'Off by default. One-click unsubscribe is in every email. No streak, no guilt copy.'));
   }
   function refreshReminders(){
@@ -3330,8 +3350,7 @@ function settingsView(){
       h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Profile')),
         h('div',{class:'row'},picPrev,h('div',{class:'row'},btn('Choose picture',{cls:'ghost',icon:'image',onclick:()=>picFile.click()}),p.picture?btn('Remove',{cls:'ghost',onclick:()=>{p.picture='';paintPic();}}):null),picFile),
         h('div',{class:'field'},h('label',null,'Display name'),name),
-        h('div',{class:'row'},btn('Save profile',{cls:'primary',onclick:saveProfile})),
-        h('p',{class:'hint'},'Shown in the top corner. The picture is stored in your account settings, not sent to Google.')),
+        h('div',{class:'row'},btn('Save profile',{cls:'primary',onclick:saveProfile}))),
       h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Appearance')),theme),
       h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Study reminders')),remBox),
       h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Data')),
@@ -3343,8 +3362,11 @@ function settingsView(){
             if(!USER){setTimeout(()=>location.reload(),1200);}
           }})),
         h('p',{class:'hint'},USER?'Account deletion has a 30-day grace period. There is no human appeal; export is the recourse.':'This removes decks, review history, settings and images from this browser.')),
-      h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Help')),
-        h('p',{class:'sub'},'Memoria has no human support desk. The help is self-service: export your data, read the error message, and try again when the server is reachable. There is no support SLA.')),
+      h('section',{class:'sec'},h('div',{class:'sec-h'},h('h2',null,'Report a bug')),
+        h('p',{class:'sub'},'Describe what went wrong. The report is saved on this server as text; there is no support desk and no reply.'),
+        h('div',{class:'field'},h('label',null,'What happened?'),bugText),
+        h('div',{class:'row'},btn('Send report',{cls:'primary',icon:'info',onclick:sendBug})),
+        bugMsg),
       msg));
 }
 async function signOut(){
@@ -3585,7 +3607,7 @@ function pubDeckView(p){
         h('span',{class:'tag'+(it.builtin?' hl':''),style:'justify-self:start'},it.builtin?'Built in':(it.mine?'Yours':'Community')),
         h('h1',null,d.title),
         d.desc?h('p',{class:'desc'},d.desc):null,
-        h('div',{class:'chips'},h('span',{class:'tag'},n+' cards'),h('span',{class:'tag'},'Blanks '+(d.choize?'on':'off')),d.example?h('span',{class:'tag'},'Example'):null),
+        h('div',{class:'chips'},h('span',{class:'tag'},n+' cards')),
         rowBtns,
         h('p',{class:'hint'},it.builtin?'Studying a built-in deck saves a link to it: if it is edited later, your copy follows.':'Pick a study mode to start. The deck is added to your own decks when you begin.'),
         vote,msg,

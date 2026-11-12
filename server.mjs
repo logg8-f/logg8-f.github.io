@@ -34,6 +34,7 @@ const OWNERS_FILE = path.join(DATA_DIR, 'owners.json'); // path -> the token tha
 const REPORTS_FILE = path.join(DATA_DIR, 'reports.json'); // gid / gid/card -> {n,last}
 const DELETIONS_FILE = path.join(DATA_DIR, 'deletions.json'); // sub -> deleteAt
 const REMINDERS_FILE = path.join(DATA_DIR, 'reminders.json'); // sub -> {email,enabled,interval,lastSent,token}
+const BUG_FILE = path.join(DATA_DIR, 'bug-reports.txt'); // human-readable, one block per report
 const RESEND_KEY = String(process.env.RESEND_API_KEY || '').trim();
 const REMINDER_FROM = String(process.env.REMINDER_FROM || 'Memoria <memoria@example.com>').trim();
 
@@ -601,6 +602,25 @@ function ankiText(s){
     .replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
     .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\n{3,}/g,'\n\n').trim();
 }
+function ankiPlain(s){return ankiText(s).replace(/\s+/g,' ').trim();}
+/* Field names referenced by a card template, in order. Conditional blocks and
+   special names (FrontSide, Tags) are ignored. "cloze:Question" -> "Question". */
+function ankiRefs(t){
+  const out=[];
+  String(t||'').replace(/\{\{([#/^!]?)([^}]+)\}\}/g,(m,flag,body)=>{
+    if(flag)return m;
+    const name=body.split(':').pop().split('|')[0].trim();
+    if(name&&!['FrontSide','Tags'].includes(name)&&!out.includes(name))out.push(name);
+    return m;
+  });
+  return out;
+}
+const CLOZE=/{{c\d+::([\s\S]*?)}}/g;
+function ankiClozeAnswers(s){
+  const out=[];
+  String(s||'').replace(CLOZE,(m,body)=>{out.push(String(body).split('::')[0]);return m;});
+  return out;
+}
 async function parseApkg(buf){
   const files=zipEntries(buf);
   const name=['collection.anki21','collection.anki2'].find(n=>files[n]);
@@ -610,18 +630,60 @@ async function parseApkg(buf){
   try{
     const {DatabaseSync}=await import('node:sqlite');
     const db=new DatabaseSync(tmp);
-    const rows=db.prepare('select flds from notes').all();
+    const notes=db.prepare('select id,mid,flds from notes').all();
+    let models={};
+    try{models=JSON.parse(String((db.prepare('select models from col limit 1').get()||{}).models||'{}'));}catch{}
+    /* One card per note: the first template is enough for a text import. */
+    const first=new Map();
+    for(const c of db.prepare('select nid,ord from cards').all()){
+      if(!first.has(c.nid)||c.ord<first.get(c.nid))first.set(c.nid,c.ord);
+    }
     db.close();
+
     const cards=[],skipped={empty:0,media:0};
-    for(const r of rows){
-      const f=String(r.flds||'').split('\x1f');
-      const w=ankiText(f[0]||''),d=ankiText(f[1]||''),e=ankiText(f[2]||'');
-      if(!w||!d){skipped.empty++;continue;}
+    for(const r of notes){
+      const vals=String(r.flds||'').split('\x1f');
+      const m=models[String(r.mid)]||{};
+      const names=(m.flds||[]).map(f=>f.name);
+      const note={};
+      names.forEach((n,i)=>{note[n]=vals[i]||'';});
+      const tmpl=(m.tmpls||[])[first.get(r.id)||0]||(m.tmpls||[])[0]||{};
+
+      /* Cloze notes are the common case for grammar decks: keep the sentence
+         with the blank on the front and the cloze text as the answer. */
+      const clozeField=names.find(n=>/\{\{c\d+::/.test(note[n]||''));
+      let w='',d='',e='';
+      if(clozeField){
+        const answers=ankiClozeAnswers(note[clozeField]).map(ankiPlain).filter(Boolean);
+        w=ankiPlain(note[clozeField].replace(CLOZE,'______'));
+        d=ankiPlain(answers.join(' / '));
+        if(!answers.length||!w){skipped.empty++;continue;}
+      }else{
+        const qrefs=ankiRefs(tmpl.qfmt),arefs=ankiRefs(tmpl.afmt);
+        const pick=(list,cands)=>cands.find(c=>list.some(n=>n.toLowerCase()===c.toLowerCase()));
+        const frontName=pick(names,['Front','Question','Term','Word','Expression','Prompt'])
+          ||qrefs.find(n=>names.includes(n))||names[0];
+        const backName=pick(names,['Back','Answer','Definition','Meaning','Translation','Explanation'])
+          ||arefs.find(n=>n!==frontName&&names.includes(n))
+          ||names.find(n=>n!==frontName);
+        w=ankiPlain(note[frontName]);
+        d=ankiPlain(note[backName]);
+        if(!w||!d){skipped.empty++;continue;}
+        const rest=names.filter(n=>n!==frontName&&n!==backName);
+        const eName=pick(rest,['Example','Sentence','Notes','Extra','Context','Hint'])
+          ||rest.find(n=>ankiPlain(note[n]));
+        e=eName?ankiPlain(note[eName]):'';
+      }
+      if(clozeField&&!e){
+        const ctx=names.filter(n=>n!==clozeField&&/^(Category|Unit|Rubric|Choices|Notes|Extra|Context)$/i.test(n))
+          .map(n=>ankiPlain(note[n])).filter(Boolean);
+        e=ctx.filter((v,i)=>ctx.indexOf(v)===i).slice(0,3).join(' · ');
+      }
       cards.push([w,d,e]);
       if(cards.length>=5000)break;
     }
     if(files['media']||files['0'])skipped.media=1;
-    return {cards:cards.slice(0,5000),skipped,total:rows.length};
+    return {cards,skipped,total:notes.length};
   }finally{try{fs.unlinkSync(tmp);}catch{}}
 }
 
@@ -714,6 +776,31 @@ const server = http.createServer(async (req, res) => {
     if (kind === 'reports' && req.method === 'GET') {
       const publicBucket = b => Object.fromEntries(Object.entries(b || {}).map(([k, v]) => [k, { n: +v.n || 0, last: +v.last || 0 }]));
       return json(res, 200, { decks: publicBucket(reports.decks), cards: publicBucket(reports.cards) });
+    }
+
+    /* ---- bug reports: appended to data/bug-reports.txt; no support desk ---- */
+    if (kind === 'bug' && req.method === 'POST') {
+      if (tooMany(ip)) return json(res, 429, { ok: false, reason: 'slow down' });
+      let body;
+      try { body = JSON.parse(await readBody(req)); }
+      catch { return json(res, 400, { ok: false, reason: 'bad body' }); }
+      const message = String((body && body.message) || '').trim().slice(0, 4000);
+      if (!message) return json(res, 400, { ok: false, reason: 'empty report' });
+      const page = String((body && body.page) || '').slice(0, 120);
+      const version = String((body && body.version) || '').slice(0, 40);
+      const ua = String(req.headers['user-agent'] || '').slice(0, 300);
+      const sub = sessionSub(req) || '';
+      const block = [
+        '[' + new Date().toISOString() + '] page=' + (page || '-') + ' version=' + (version || '-') +
+          ' user=' + (sub || '-') + ' ip=' + ip,
+        message,
+        'ua=' + ua,
+        '---',
+        '',
+      ].join('\n');
+      try { fs.appendFileSync(BUG_FILE, block, 'utf8'); }
+      catch { return json(res, 500, { ok: false, reason: 'could not save' }); }
+      return json(res, 200, { ok: true });
     }
 
     /* ---- account deletion: 30-day grace; no human appeal ---- */

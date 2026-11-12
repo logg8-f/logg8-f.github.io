@@ -1,7 +1,7 @@
 /* Memoria offline shell. Decks and review state already live in localStorage;
    this makes the app itself open without a network connection. API calls are
    never cached: they must fail so the write queue can retry. */
-const CACHE = 'memoria-v2.16.2';
+const CACHE = 'memoria-v2.16.3';
 const ASSETS = ['./', './index.html', './favicon.svg', './favicon.ico', './apple-touch-icon.png', './manifest.webmanifest'];
 
 self.addEventListener('install', event => {

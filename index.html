@@ -53,6 +53,7 @@ button:disabled{cursor:not-allowed}
 .brand svg{width:32px;height:32px;flex:none}
 .brand b{font:500 13px/1 var(--f-mono);background:var(--hl);color:var(--on-hl);padding:4px 6px;border-radius:5px;transform:rotate(-3deg);letter-spacing:0}
 .ver{margin-left:12px;font:500 11px/1 var(--f-mono);color:var(--ink-2);opacity:.4;letter-spacing:.03em;user-select:none;cursor:default}
+@media (max-width:560px){.ver{display:none}}
 .acct{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0;position:relative}
 .acct-btn{display:inline-flex;align-items:center;gap:8px;min-width:0;padding:3px 10px 3px 3px;border:1.5px solid transparent;border-radius:999px;background:transparent;color:var(--ink);font:600 14px/1 var(--f-body);cursor:pointer;transition:border-color .12s,background .12s}
 .acct-btn:hover{border-color:var(--line);background:var(--surface)}
@@ -105,7 +106,8 @@ button:disabled{cursor:not-allowed}
 @keyframes rise{from{transform:translateY(5px)}to{transform:none}}
 .eyebrow{font:500 12px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
 .sec{margin-top:48px}
-.sec-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.sec-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.sec-h .btn{white-space:nowrap}
 .sec-h h2{font-size:1.6rem}
 .sub{color:var(--ink-2)}
 
@@ -113,6 +115,10 @@ button:disabled{cursor:not-allowed}
 .hero{display:grid}
 .hero-copy{display:grid;gap:18px;justify-items:start;max-width:62ch}
 .hero h1{font-size:clamp(2.3rem,6vw,3.9rem);line-height:1.02;font-weight:700;letter-spacing:-.03em}
+.hero.compact{padding-top:4px}
+.hero.compact .hero-copy{gap:12px}
+.hero.compact h1{font-size:clamp(1.9rem,4.5vw,2.8rem)}
+.hero.compact .lead{font-size:1rem}
 .lead{font-size:1.15rem;color:var(--ink-2);max-width:46ch}
 
 /* decks */
@@ -165,6 +171,8 @@ details.cards-list summary{padding:14px 16px;font-weight:600;cursor:pointer}
 
 /* forms */
 .form{max-width:780px;display:grid;gap:22px}
+.form>.btn{justify-self:start}
+.form .seg,.field>.seg{justify-self:start}
 .settings-form{max-width:760px;gap:0}
 .settings-form>h1{margin-bottom:10px}
 .settings-form .sec{margin-top:24px}
@@ -233,7 +241,7 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 
 /* study shell */
 .sbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;margin-bottom:22px}
-.sbar-t{font-size:1.1rem;text-align:center}
+.sbar-t{font-size:1.1rem;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sbar-mid{display:flex;align-items:center;justify-content:center;gap:16px;min-width:0}
 .mstats{display:flex;align-items:center;gap:14px;font:500 12.5px var(--f-mono);color:var(--ink-2);white-space:nowrap}
 .sbar .btn.link{justify-self:start}
@@ -277,6 +285,7 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .mcol-h{font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
 .mlist{display:grid;gap:10px}
 @media (max-width:560px){.mgrid{gap:8px}.mlist{gap:8px}.tile{min-height:76px;padding:10px 11px;font-size:13.5px}.tile.k-w{font-size:15px}}
+@media (max-width:640px){.fns{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.fn{padding:12px;gap:6px;border-radius:12px}.fn-i{width:34px;height:34px;border-radius:9px}.fn h3{font-size:1rem}.fn p{font-size:12.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
 .tile{display:flex;align-items:center;gap:10px;text-align:left;min-height:96px;padding:14px 16px;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:12px;font:500 15px/1.35 var(--f-body);overflow-wrap:anywhere;transition:background .12s,border-color .12s,opacity .25s,transform .12s}
 .tile.k-w{font:600 17px/1.25 var(--f-display)}
 .tile:hover:not(:disabled){border-color:var(--ink)}
@@ -288,7 +297,7 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 @keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
 
 /* write, choose, learn */
-.wtop{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.wtop{display:flex;align-items:center;gap:14px;max-width:720px;margin:0 auto 20px}
 .pbar{flex:1;height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
 .pbar i{display:block;height:100%;width:0;background:var(--ink);border-radius:99px;transition:width .3s}
 .wq{max-width:720px;margin:0 auto;display:grid;gap:18px}
@@ -321,7 +330,7 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .miss-list{list-style:none;padding:0;margin:0;display:grid;gap:6px;width:100%}
 .miss-list li{padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);overflow-wrap:anywhere}
 .miss-list .arrow{color:var(--ink-2);margin-inline:8px}
-.lhead{display:grid;gap:12px;margin-bottom:22px}
+.lhead{display:grid;gap:12px;max-width:720px;margin:0 auto 22px}
 .trail{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .trail .sep{color:var(--ink-2)}
 .chip{border:1.5px solid var(--line);border-radius:999px;padding:3px 11px;font:500 12px var(--f-mono);color:var(--ink-2);background:var(--surface)}
@@ -329,7 +338,7 @@ details.paste>summary{padding:14px 16px;font-weight:600;cursor:pointer}
 .chip.done{color:var(--ink)}
 .lprog{display:flex;align-items:center;gap:14px}
 .lprog .mono{font-size:13px;min-width:44px;text-align:right}
-.lcap{font-weight:600;color:var(--ink-2);margin-bottom:14px}
+.lcap{max-width:720px;margin:0 auto 14px;font-weight:600;color:var(--ink-2)}
 .intro{display:grid;gap:12px;justify-items:center;text-align:center;padding:36px 12px}
 .intro h2{font-size:1.8rem}
 .intro p{max-width:46ch;color:var(--ink-2)}
@@ -469,7 +478,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.16.4';
+const APP_VERSION='2.16.5';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -1451,7 +1460,8 @@ function missing(){
   return homeView();
 }
 function studyBar(title,backLabel,backFn,extra){
-  const mid=extra?h('div',{class:'sbar-mid'},h('h1',{class:'sbar-t'},title),extra):h('h1',{class:'sbar-t'},title);
+  const label=h('h1',{class:'sbar-t',title:title},title);
+  const mid=extra?h('div',{class:'sbar-mid'},label,extra):label;
   return h('div',{class:'sbar'},btn(backLabel,{cls:'link',icon:'back',onclick:backFn}),mid,h('span'));
 }
 function clozeNode(parts,hide,answerLen){
@@ -1513,7 +1523,6 @@ function deckTile(d){
   const el=h('button',{type:'button',class:'deck'+(dc?' c-colored':''),style:dc?('--dc:'+dc):null,
     onclick:()=>go('deck',{id:d.id}),
     oncontextmenu:e=>{e.preventDefault();openDeckSettings(d);}},
-    d.example?h('span',{class:'tag'},'Example'):null,
     h('h3',null,d.title),
     d.desc?h('p',null,d.desc):null,
     h('span',{class:'meta'},dc?h('span',{class:'deck-dot','aria-hidden':'true'}):null,
@@ -1576,15 +1585,26 @@ function openDeckSettings(d){
   title.select();
 }
 function homeView(){
-  const hero=h('section',{class:'hero'},
-    h('div',{class:'hero-copy'},
-      h('h1',null,'Welcome to ',h('span',{class:'mark'},'Memoria'),'.'),
-      h('p',{class:'lead'},'To get started, create a deck of words and definitions. Then study it with flashcards, match, write, learn and test.'),
-      h('div',{class:'row'},
-        btn('Browse public decks',{cls:'browse-cta',icon:'globe',onclick:()=>go('browse')}))));
-
   pruneReview(false);
   const items=reviewItems();
+  const rs=S.resume;
+  const rd=rs&&RESUME_NAMES[rs.name]&&deckById(rs.id);
+  const returning=!!(S.decks.length||items.length||rd);
+  const who=(S.profile&&S.profile.name)||(USER&&(USER.name||USER.email))||'';
+  const hero=returning
+    ? h('section',{class:'hero compact'},
+        h('div',{class:'hero-copy'},
+          h('p',{class:'eyebrow'},who?'Welcome back, '+who:'Your study space'),
+          h('h1',null,'Ready to ',h('span',{class:'mark'},'study'),'?'),
+          h('p',{class:'lead'},'Choose a deck below, or browse the public library for something new.'),
+          h('div',{class:'row'},
+            btn('Browse public decks',{cls:'ghost',icon:'globe',onclick:()=>go('browse')}))))
+    : h('section',{class:'hero'},
+        h('div',{class:'hero-copy'},
+          h('h1',null,'Welcome to ',h('span',{class:'mark'},'Memoria'),'.'),
+          h('p',{class:'lead'},'To get started, create a deck of words and definitions. Then study it with flashcards, match, write, learn and test.'),
+          h('div',{class:'row'},
+            btn('Browse public decks',{cls:'browse-cta',icon:'globe',onclick:()=>go('browse')}))));
   let deckQ='';
   const deckList=h('div',{class:'decks'});
   const deckInfo=h('p',{class:'hint','aria-live':'polite'});
@@ -1613,8 +1633,6 @@ function homeView(){
     deckList);
 
   const root=h('div',{class:'wrap view'},hero);
-  const rs=S.resume;
-  const rd=rs&&RESUME_NAMES[rs.name]&&deckById(rs.id);
   if(rd){
     root.append(h('section',{class:'resume'},
       h('div',{class:'rs-t'},h('p',{class:'eyebrow'},'Continue where you left off'),
@@ -1766,13 +1784,12 @@ function deckView(p){
     rv.length?h('div',{class:'note-row'},
       h('span',null,h('strong',null,rv.length+(rv.length===1?' card':' cards')),' from this deck are in your review list.'),
       btn('Review them',{cls:'hl',icon:'write',onclick:()=>go('write',{id:d.id,review:true})})):null,
-    statsPanel(d),
     (()=>{
       let q='';
       const search=h('input',{type:'search',class:'in',placeholder:'Search cards in this deck',autocomplete:'off','aria-label':'Search cards in this deck',
         oninput:e=>{q=e.target.value;paintCards();}});
       const box=h('div',{class:'cl'});
-      const count=h('span',{class:'sub mono'});
+      const count=h('p',{class:'hint',hidden:true});
       function paintCards(){
         const toks=loose(q).split(' ').filter(Boolean);
         const items=d.cards.filter(c=>{
@@ -1785,11 +1802,13 @@ function deckView(p){
             h('div',null,cimg(c.wi,'cl-img'),rich(c.w)),
             h('div',null,cimg(c.di,'cl-img'),rich(c.d))]));
         count.textContent=items.length+(items.length===1?' card':' cards')+(q.trim()?' match':'');
+        count.hidden=!q.trim();
       }
       paintCards();
-      return h('div',{class:'deck-cards'},search,h('p',{class:'hint'},count),
+      return h('div',{class:'deck-cards'},search,count,
         h('details',{class:'cards-list'},h('summary',null,'Cards in this deck ('+n+')'),box));
-    })());
+    })(),
+    statsPanel(d));
   return root;
 }
 
@@ -2656,7 +2675,7 @@ function learnView(p){
   }
   function sLearn(){
     kill();L.steps=0;head();
-    cap.textContent='Choose the correct answer';
+    cap.textContent='Section '+(L.sec+1)+' of '+secs.length+' · Choose the correct answer';
     eng=writeEngine(box,secs[L.sec],{once:true,forceChoice:true,noReview:true,hideProg:true,getDir,avoid:seenBefore(L.sec),resume:L.q?{q:L.q}:null,
       onProgress:s=>{L.q=s.q;head();saveLearn();},
       onAnswer:(c,ok)=>{if(!ok){L.missed.add(c.id);L.everMissed.add(c.id);}saveLearn();},
@@ -2672,7 +2691,7 @@ function learnView(p){
   function pMC2(){
     kill();head();
     if(!L.inc.length){L.q=null;L.steps=2;head();saveLearn();return pW();}
-    cap.textContent='Choose again until you get the missed ones right';
+    cap.textContent='Section '+(L.sec+1)+' of '+secs.length+' · Retry the missed ones';
     eng=writeEngine(box,L.inc,{forceChoice:true,noReview:true,hideProg:true,getDir,avoid:seenBefore(L.sec+1),resume:L.q?{q:L.q}:null,
       onProgress:s=>{L.q=s.q;head();saveLearn();},
       onDone:()=>{L.q=null;L.steps=2;head();saveLearn();pW();}});
@@ -2680,7 +2699,7 @@ function learnView(p){
   }
   function pW(){
     kill();head();
-    cap.textContent='Now write the answers';
+    cap.textContent='Section '+(L.sec+1)+' of '+secs.length+' · Write the answers';
     eng=writeEngine(box,secs[L.sec],wOpts({noReview:true,hideProg:true,resume:L.q?{q:L.q}:null,
       onProgress:s=>{L.q=s.q;head();saveLearn();},
       onAnswer:(c,ok)=>{if(!ok)L.everMissed.add(c.id);saveLearn();},
@@ -2755,7 +2774,7 @@ function testView(p){
         tests.length?h('p',{class:'sub'},'Last result '+tests[tests.length-1].right+' / '+tests[tests.length-1].total+' · best '+Math.max.apply(null,tests.map(t=>Math.round(t.right/t.total*100)))+'%'):null,
         h('p',{class:'sub'},N+' questions, one for every card in the deck.'),
         h('div',{class:'field'},h('span',{class:'lbl'},'Question types'),
-          h('div',{class:'setting',style:'display:grid;gap:4px'},
+          h('div',{class:'setting',style:'display:flex;flex-direction:column;gap:4px;align-items:stretch'},
             ['tf','mc','wr'].map(k=>{
               const off=N<2&&(k==='tf'||k==='mc');
               return toggle(TYPE_LABEL[k]+(off?' (needs 2+ cards)':''),cfg.types[k],on=>{cfg.types[k]=on;},{disabled:off});
@@ -3189,8 +3208,10 @@ function importView(){
   const text=h('textarea',{class:'in mono',rows:'12',placeholder:'Paste Quizlet export, CSV, or one card per line:\nword ; definition ; example'});
   const file=h('input',{type:'file',accept:'.apkg,.txt,.csv,text/plain,text/csv,application/octet-stream'});
   const fileWrap=h('div',{class:'field'},h('label',null,'Anki .apkg file'),file);
+  const createBtn=btn('Create deck',{cls:'hl',icon:'plus',onclick:create,disabled:true});
   function paint(){
     preview.replaceChildren();
+    createBtn.disabled=!pairs.length;
     if(pairs.length){
       preview.append(h('p',{class:'hint'},pairs.length+' cards ready. '+pairs.slice(0,4).map(p=>p[0]+' → '+p[1]).join(' · ')+(pairs.length>4?' …':'')));
     }
@@ -3235,7 +3256,7 @@ function importView(){
       h('div',{class:'field'},h('label',null,'Format'),seg([['text','Quizlet text / CSV'],['anki','Anki .apkg']],mode,setMode,'Import format')),
       h('div',{class:'field'},h('label',null,'Deck title'),titleIn),
       text,fileWrap,
-      h('div',{class:'row'},btn('Preview',{cls:'primary',icon:'next',onclick:parseNow}),btn('Create deck',{cls:'hl',icon:'plus',onclick:create})),
+      h('div',{class:'row'},btn('Preview',{cls:'primary',icon:'next',onclick:parseNow}),createBtn),
       preview,msg));
 }
 
@@ -3539,7 +3560,7 @@ function openReport(gid,card,label){
 function pubTile(it){
   const dc=safeColor(it.deck.color);
   return h('button',{type:'button',class:'deck'+(dc?' c-colored':''),style:dc?('--dc:'+dc):null,onclick:()=>openPublic(it)},
-    h('span',{class:'tag'+(it.builtin?' hl':'')},it.builtin?'Built in':(it.mine?'Yours':'Community')),
+    h('span',{class:'tag'+(it.mine?' hl':'')},it.builtin?'Built in':(it.mine?'Yours':'Community')),
     h('h3',null,it.deck.title),
     it.deck.desc?h('p',null,it.deck.desc):null,
     h('span',{class:'meta'},dc?h('span',{class:'deck-dot','aria-hidden':'true'}):null,it.deck.cards.length+' cards',
@@ -3609,7 +3630,7 @@ function pubDeckView(p){
     root.replaceChildren(...[
       btn('Browse public decks',{cls:'link',icon:'back',onclick:()=>histBack('browse')}),
       h('div',{class:'hub-top'},
-        h('span',{class:'tag'+(it.builtin?' hl':''),style:'justify-self:start'},it.builtin?'Built in':(it.mine?'Yours':'Community')),
+        h('span',{class:'tag'+(it.mine?' hl':''),style:'justify-self:start'},it.builtin?'Built in':(it.mine?'Yours':'Community')),
         h('h1',null,d.title),
         d.desc?h('p',{class:'desc'},d.desc):null,
         h('div',{class:'chips'},h('span',{class:'tag'},n+' cards')),

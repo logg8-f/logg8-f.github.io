@@ -652,12 +652,19 @@ async function parseApkg(buf){
       /* Cloze notes are the common case for grammar decks: keep the sentence
          with the blank on the front and the cloze text as the answer. */
       const clozeField=names.find(n=>/\{\{c\d+::/.test(note[n]||''));
+      /* Only a field actually called Example is an example. Other third fields
+         (Unit, Rubric, Notes) are context: keep them in the prompt instead. */
+      const exampleField=names.find(n=>/^examples?$/i.test(n));
       let w='',d='',e='';
       if(clozeField){
         const answers=ankiClozeAnswers(note[clozeField]).map(ankiPlain).filter(Boolean);
-        w=ankiPlain(note[clozeField].replace(CLOZE,'______'));
+        const front=ankiPlain(note[clozeField].replace(CLOZE,'______'));
+        const ctx=names.filter(n=>n!==clozeField&&n!==exampleField&&/^(Category|Unit|Rubric|Choices|Notes|Extra|Context)$/i.test(n))
+          .map(n=>ankiPlain(note[n])).filter((v,i,a)=>v&&a.indexOf(v)===i).slice(0,3);
+        w=ankiPlain([front].concat(ctx).filter(Boolean).join(' · '));
         d=ankiPlain(answers.join(' / '));
-        if(!answers.length||!w){skipped.empty++;continue;}
+        if(!answers.length||!front){skipped.empty++;continue;}
+        if(exampleField)e=ankiPlain(note[exampleField]);
       }else{
         const qrefs=ankiRefs(tmpl.qfmt),arefs=ankiRefs(tmpl.afmt);
         const pick=(list,cands)=>cands.find(c=>list.some(n=>n.toLowerCase()===c.toLowerCase()));
@@ -669,15 +676,15 @@ async function parseApkg(buf){
         w=ankiPlain(note[frontName]);
         d=ankiPlain(note[backName]);
         if(!w||!d){skipped.empty++;continue;}
-        const rest=names.filter(n=>n!==frontName&&n!==backName);
-        const eName=pick(rest,['Example','Sentence','Notes','Extra','Context','Hint'])
-          ||rest.find(n=>ankiPlain(note[n]));
-        e=eName?ankiPlain(note[eName]):'';
-      }
-      if(clozeField&&!e){
-        const ctx=names.filter(n=>n!==clozeField&&/^(Category|Unit|Rubric|Choices|Notes|Extra|Context)$/i.test(n))
-          .map(n=>ankiPlain(note[n])).filter(Boolean);
-        e=ctx.filter((v,i)=>ctx.indexOf(v)===i).slice(0,3).join(' · ');
+        if(exampleField){
+          e=ankiPlain(note[exampleField]);
+        }else{
+          const rest=names.filter(n=>n!==frontName&&n!==backName);
+          const extraName=pick(rest,['Sentence','Notes','Extra','Context','Hint'])
+            ||rest.find(n=>ankiPlain(note[n]));
+          const extra=extraName?ankiPlain(note[extraName]):'';
+          if(extra&&extra!==d)w=ankiPlain(w+' · '+extra);
+        }
       }
       cards.push([w,d,e]);
       if(cards.length>=5000)break;

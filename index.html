@@ -469,7 +469,7 @@ select.in{appearance:auto}
 /* Bump this on every change we ship — a patch for small fixes, a minor for new
    features — so it is always possible to tell which version a page is running.
    It is shown, quietly, at the right end of the header. */
-const APP_VERSION='2.16.3';
+const APP_VERSION='2.16.4';
 /* Bump this to make every browser drop its cached decks once, on the next
    visit. Used together with a server-side wipe so old copies cannot come back. */
 const DATA_RESET='2026-10-24-clean-1';
@@ -1783,8 +1783,7 @@ function deckView(p){
         box.replaceChildren(h('div',{class:'h'},'Word'),h('div',{class:'h'},'Definition'),
           ...items.flatMap(c=>[
             h('div',null,cimg(c.wi,'cl-img'),rich(c.w)),
-            h('div',null,cimg(c.di,'cl-img'),rich(c.d),
-              h('button',{type:'button',class:'btn link',style:'padding:2px 0 0;font-size:12px',onclick:()=>go('edit',{id:d.id,focusCard:c.id})},'Edit this card'))]));
+            h('div',null,cimg(c.di,'cl-img'),rich(c.d))]));
         count.textContent=items.length+(items.length===1?' card':' cards')+(q.trim()?' match':'');
       }
       paintCards();
@@ -3316,11 +3315,17 @@ function settingsView(){
       remBox.append(loginNote('use email reminders'));
       return;
     }
-    let enabled=!!r.enabled,interval=+r.interval||7;
+    let enabled=!!r.enabled;
+    const allowed=[1,3,7,14,30];
+    let interval=enabled?(allowed.includes(+r.interval)?+r.interval:7):7;
     const status=h('p',{class:'hint','aria-live':'polite'});
-    const select=h('select',{class:'in',onchange:e=>{interval=+e.target.value;save();}},[[1,'Every day'],[3,'Every 3 days'],[7,'Every week'],[14,'Every 2 weeks'],[30,'Every 30 days']].map(x=>h('option',{value:x[0]},x[1])));
-    select.value=String(interval);
-    const tg=toggle('Email reminders',enabled,on=>{enabled=on;save();},{});
+    const select=h('select',{class:'in',onchange:e=>{
+      const v=e.target.value;
+      enabled=v!=='off';
+      interval=enabled?+v:7;
+      save();
+    }},[['off','Off'],['1','Every 1 day'],['3','Every 3 days'],['7','Every 7 days'],['14','Every 14 days'],['30','Every 30 days']].map(x=>h('option',{value:x[0]},x[1])));
+    select.value=enabled?String(interval):'off';
     const save=async()=>{
       try{
         const res=await fetch(API_BASE+'reminders',{method:'POST',cache:'no-store',headers:{'content-type':'application/json'},body:JSON.stringify({enabled,interval})});
@@ -3330,7 +3335,7 @@ function settingsView(){
         touchMeta();status.textContent='';
       }catch(e){status.textContent='Could not save reminders.';}
     };
-    remBox.append(tg,h('div',{class:'field'},h('label',null,'Interval'),select),status,
+    remBox.append(h('div',{class:'field'},h('label',null,'Email reminders'),select),status,
       h('p',{class:'hint'},'Off by default. One-click unsubscribe is in every email. No streak, no guilt copy.'));
   }
   function refreshReminders(){
